@@ -1,22 +1,20 @@
 // 자동 생성 파일 — 직접 고치지 말고 update_data.py를 실행하세요.
 window.MARKET_DATA = {
-  "generatedAt": "2026-11-25T08:25",
+  "generatedAt": "2026-11-25T08:27",
   "macro": {
     "us10y": {
-      "value": 4.92,
-      "asOf": "2026-11-23",
-      "source": "FRED DGS10",
-      "value_3m_ago": 4.64,
-      "prev": 4.92,
-      "stale": true
+      "value": 4.9,
+      "asOf": "2026-11-24",
+      "source": "Yahoo ^TNX (시장 호가, 재무부 고시와 소폭 차이)",
+      "value_3m_ago": 4.66,
+      "prev": 4.92
     },
     "effr": {
       "value": 3.88,
       "asOf": "2026-11-23",
-      "source": "FRED EFFR",
+      "source": "NY 연준 EFFR API",
       "value_3m_ago": 3.63,
-      "prev": 3.88,
-      "stale": true
+      "prev": 3.88
     },
     "hy_oas": {
       "value": 3.63,
@@ -45,10 +43,9 @@ window.MARKET_DATA = {
     "rrp_billion": {
       "value": 0.301,
       "asOf": "2026-11-24",
-      "source": "FRED RRPONTSYD",
+      "source": "NY 연준 역레포 운영 결과 API",
       "value_3m_ago": 0.702,
-      "prev": 0.35,
-      "stale": true
+      "prev": 0.35
     },
     "m2_billion": {
       "value": 23532.8,
@@ -61,18 +58,16 @@ window.MARKET_DATA = {
     "nasdaq": {
       "value": 23733.54,
       "asOf": "2026-11-24",
-      "source": "FRED NASDAQCOM",
+      "source": "Yahoo ^IXIC",
       "value_3m_ago": 26130.2,
-      "prev": 24089.56,
-      "stale": true
+      "prev": 24089.56
     },
     "sp500": {
-      "value": 7237.17,
-      "asOf": "2026-11-23",
-      "source": "FRED SP500",
-      "value_3m_ago": 7677.28,
-      "prev": 6910.39,
-      "stale": true
+      "value": 7201.09,
+      "asOf": "2026-11-24",
+      "source": "Yahoo ^GSPC",
+      "value_3m_ago": 7675.7,
+      "prev": 7237.17
     }
   },
   "vix": {
@@ -302,14 +297,9 @@ window.MARKET_DATA = {
     }
   },
   "errors": [
-    "FRED RRPONTSYD: The read operation timed out",
-    "FRED BAMLH0A0HYM2: The read operation timed out",
-    "FRED WRESBAL: The read operation timed out",
-    "FRED DGS10: The read operation timed out",
     "FRED BAMLH0A3HYC: The read operation timed out",
-    "FRED EFFR: The read operation timed out",
-    "FRED NASDAQCOM: The read operation timed out",
-    "FRED M2SL: The read operation timed out",
-    "FRED SP500: The read operation timed out"
+    "FRED WRESBAL: The read operation timed out",
+    "FRED BAMLH0A0HYM2: The read operation timed out",
+    "FRED M2SL: The read operation timed out"
   ]
 };

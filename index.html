@@ -43,7 +43,7 @@
 
 <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
 
-<header class="sticky top-0 z-40 bg-[#0b0f19]/95 backdrop-blur-md border-b border-gray-800">
+<header class="relative sm:sticky top-0 z-40 bg-[#0b0f19]/95 backdrop-blur-md border-b border-gray-800">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
     <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
       <div class="space-y-1.5 min-w-0">
@@ -231,6 +231,31 @@
         <div id="dca-summary" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs"></div>
       </div>
 
+      <!-- 일봉 차트: 가격 + 200/240/365일선 + 분할 기준선 + 거래량 -->
+      <div class="inset p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div class="text-sm font-bold text-white"><span id="chart-title">차트</span> <span class="text-xs font-normal text-gray-400">일봉</span></div>
+            <div id="chart-position" class="text-xs text-gray-300 mt-0.5"></div>
+          </div>
+          <div class="flex gap-1.5" id="chart-range">
+            <button data-range="126" aria-pressed="false" class="chip px-2.5 py-1 rounded-lg text-xs">6개월</button>
+            <button data-range="252" aria-pressed="true" class="chip px-2.5 py-1 rounded-lg text-xs">1년</button>
+            <button data-range="504" aria-pressed="false" class="chip px-2.5 py-1 rounded-lg text-xs">2년</button>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px]">
+          <span class="text-gray-300"><span class="inline-block w-3 h-0.5 align-middle bg-gray-300 mr-1"></span>주가</span>
+          <span class="text-sky-400"><span class="inline-block w-3 h-0.5 align-middle bg-sky-400 mr-1"></span>200일선</span>
+          <span class="text-amber-400"><span class="inline-block w-3 h-0.5 align-middle bg-amber-400 mr-1"></span>240일선</span>
+          <span class="text-rose-400"><span class="inline-block w-3 h-0.5 align-middle bg-rose-400 mr-1"></span>365일선</span>
+          <span class="text-purple-400"><span class="inline-block w-3 border-t border-dashed border-purple-400 align-middle mr-1"></span>극단 저점</span>
+          <span class="text-emerald-400"><span class="inline-block w-2 h-2 align-middle bg-emerald-400 mr-1"></span>거래량 급증 (50일 평균 2배+)</span>
+        </div>
+        <div id="price-chart" class="w-full h-[340px] sm:h-[420px]"></div>
+        <div id="chart-volume-note" class="text-[11px] text-gray-400"></div>
+      </div>
+
       <div class="overflow-x-auto">
         <table class="w-full text-left border-collapse text-xs sm:text-sm">
           <thead>
@@ -380,6 +405,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== `tab-${tab}`));
   document.querySelectorAll('[role="tab"]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
   store.set('cf_tab', tab);
+  if (tab === 'dca') renderChart($('dca-ticker').value.trim().toUpperCase());
 }
 document.querySelectorAll('[role="tab"]').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 
@@ -762,6 +788,7 @@ function loadDcaSymbol(sym, toast) {
   document.querySelectorAll('[data-sym]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sym === sym)));
   store.set('cf_dca_sym', sym);
   calculateDca();
+  if (!$('tab-dca').classList.contains('hidden')) renderChart(sym);
   if (toast) showToast(`${sym} 실데이터(${s.asOf})를 불러왔습니다.`, 'info');
 }
 
@@ -855,13 +882,14 @@ function calculateDca() {
   $('dca-data-src').innerHTML = s
     ? `${esc(s.name)} · Yahoo 일봉 종가 ${s.bars}개로 계산 · 기준 ${esc(s.asOf)} · 52주 고점 ${usd(s.high52w)} (${pct(s.drawdown_from_high_pct)})${edited ? ' · <span class="stale">값을 직접 수정함</span>' : ''}`
     : '직접 입력값';
+  if (chartState.sym) updateChartLevels();
 }
 ['dca-budget', 'dca-current', 'dca-ma200', 'dca-ma240', 'dca-ma365', 'dca-extreme-pct', 'dca-vol-spike', 'dca-extreme-auto'].forEach(id => $(id).addEventListener('input', calculateDca));
 $('dca-extreme').addEventListener('input', () => { $('dca-extreme-auto').checked = false; calculateDca(); });
 $('dca-ticker').addEventListener('change', () => {
   const sym = $('dca-ticker').value.trim().toUpperCase();
   if (D?.stocks?.[sym]) loadDcaSymbol(sym, true);
-  else { currentSymbol = null; document.querySelectorAll('[data-sym]').forEach(b => b.setAttribute('aria-pressed', 'false')); calculateDca(); showToast(`${sym}는 감시 목록에 없어 값을 직접 입력해야 합니다.`, 'warn'); }
+  else { currentSymbol = null; document.querySelectorAll('[data-sym]').forEach(b => b.setAttribute('aria-pressed', 'false')); calculateDca(); renderChart(sym); showToast(`${sym}는 감시 목록에 없어 값을 직접 입력해야 합니다.`, 'warn'); }
 });
 
 $('btn-copy-alert').addEventListener('click', () => {
@@ -878,6 +906,138 @@ $('btn-copy-alert').addEventListener('click', () => {
   ];
   copyText(lines.join('\n'), `${t} 알림 요약을 복사했습니다.`);
 });
+
+// =====================================================================
+// 6-1. 일봉 차트 (10분할 탭을 처음 열 때 라이브러리와 일봉 데이터를 불러옴)
+// =====================================================================
+const CHART_LIB = 'https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';
+const chartState = { ready: null, chart: null, series: {}, lines: [], sym: null, range: 252 };
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const s = Object.assign(document.createElement('script'), { src, async: true });
+    s.onload = resolve; s.onerror = () => reject(new Error(src + ' 로드 실패'));
+    document.head.appendChild(s);
+  });
+}
+function ensureChart() {
+  if (!chartState.ready) {
+    chartState.ready = Promise.all([
+      window.LightweightCharts ? null : loadScript(CHART_LIB),
+      window.MARKET_HISTORY ? null : loadScript('history.js?v=' + encodeURIComponent(D?.generatedAt || '')),
+    ]).then(() => {
+      const LC = window.LightweightCharts;
+      const chart = LC.createChart($('price-chart'), {
+        autoSize: true,
+        layout: { background: { color: 'transparent' }, textColor: '#9ca3af', fontFamily: 'Inter, sans-serif' },
+        grid: { vertLines: { color: 'rgba(31,41,55,.6)' }, horzLines: { color: 'rgba(31,41,55,.6)' } },
+        rightPriceScale: { borderColor: '#1f2937', scaleMargins: { top: 0.06, bottom: 0.24 } },
+        timeScale: { borderColor: '#1f2937' },
+        crosshair: { mode: LC.CrosshairMode.Normal },
+        localization: { locale: 'ko-KR', priceFormatter: p => '$' + p.toFixed(2) },
+      });
+      chartState.chart = chart;
+      chartState.series.candle = chart.addCandlestickSeries({
+        upColor: '#d1d5db', downColor: '#4b5563', borderUpColor: '#d1d5db', borderDownColor: '#6b7280',
+        wickUpColor: '#9ca3af', wickDownColor: '#6b7280', priceLineColor: '#f3f4f6',
+      });
+      // 이평선 값 라벨은 아래 분할 기준선(점선) 라벨과 겹치므로 숨김
+      const line = color => chart.addLineSeries({ color, lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+      chartState.series.ma200 = line('#38bdf8');
+      chartState.series.ma240 = line('#f59e0b');
+      chartState.series.ma365 = line('#f43f5e');
+      chartState.series.vol = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
+      chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+    });
+  }
+  return chartState.ready;
+}
+
+function smaSeries(closes, times, n) {
+  const out = []; let sum = 0;
+  for (let i = 0; i < closes.length; i++) {
+    sum += closes[i];
+    if (i >= n) sum -= closes[i - n];
+    if (i >= n - 1) out.push({ time: times[i], value: +(sum / n).toFixed(2) });
+  }
+  return out;
+}
+
+async function renderChart(sym) {
+  const box = $('price-chart');
+  try { await ensureChart(); } catch (e) {
+    box.innerHTML = `<div class="h-full flex items-center justify-center text-xs text-amber-300">차트를 불러오지 못했습니다 (${esc(e.message)}). 인터넷 연결을 확인하세요.</div>`;
+    return;
+  }
+  const h = window.MARKET_HISTORY?.[sym];
+  $('chart-title').textContent = sym ? `${sym}` : '차트';
+  if (!h) {
+    Object.values(chartState.series).forEach(s => s.setData([]));
+    $('chart-position').textContent = sym ? `${sym}는 감시 목록에 없어 차트가 없습니다 (manual_inputs.json의 watchlist에 추가).` : '';
+    $('chart-volume-note').textContent = '';
+    return;
+  }
+  chartState.sym = sym;
+  const { t, o, h: hi, l, c, v } = h;
+  chartState.series.candle.setData(t.map((time, i) => ({ time, open: o[i], high: hi[i], low: l[i], close: c[i] })));
+  chartState.series.ma200.setData(smaSeries(c, t, 200));
+  chartState.series.ma240.setData(smaSeries(c, t, 240));
+  chartState.series.ma365.setData(smaSeries(c, t, 365));
+
+  // 거래량: 50일 평균의 2배 이상이면 급증으로 표시
+  const spikes = [];
+  let vsum = 0;
+  const volData = t.map((time, i) => {
+    vsum += v[i]; if (i >= 50) vsum -= v[i - 50];
+    const avg = i >= 49 ? vsum / 50 : null;
+    const spike = avg && v[i] >= avg * 2;
+    if (spike) spikes.push({ time, ratio: v[i] / avg, close: c[i] });
+    return { time, value: v[i], color: spike ? 'rgba(16,185,129,.9)' : (c[i] >= o[i] ? 'rgba(156,163,175,.35)' : 'rgba(75,85,99,.5)') };
+  });
+  chartState.series.vol.setData(volData);
+  chartState.series.candle.setMarkers(spikes.slice(-5).map(s => ({ time: s.time, position: 'belowBar', color: '#10b981', shape: 'arrowUp', text: `${s.ratio.toFixed(1)}x` })));
+
+  const recent = spikes.filter(s => t.indexOf(s.time) >= t.length - 20);
+  $('chart-volume-note').innerHTML = recent.length
+    ? `최근 20거래일 거래량 급증 <b class="text-emerald-400">${recent.length}회</b> — 마지막 ${esc(recent.at(-1).time)} (평균의 ${recent.at(-1).ratio.toFixed(1)}배, 종가 ${usd(recent.at(-1).close)}). 365일선 부근에서 나온 급증이면 "거래량 급증 확인" 체크 근거가 됩니다.`
+    : '최근 20거래일 동안 50일 평균의 2배를 넘는 거래량 급증은 없었습니다.';
+
+  updateChartLevels();
+  // 탭이 막 보이기 시작한 직후엔 차트 폭이 0일 수 있어 다음 프레임에 범위를 적용
+  requestAnimationFrame(() => requestAnimationFrame(() => setChartRange(chartState.range)));
+}
+
+function setChartRange(n) {
+  chartState.range = n;
+  document.querySelectorAll('[data-range]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.range === n)));
+  const len = window.MARKET_HISTORY?.[chartState.sym]?.t.length;
+  if (chartState.chart && len) chartState.chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, len - n), to: len + 3 });
+  store.set('cf_chart_range', n);
+}
+document.querySelectorAll('[data-range]').forEach(b => b.addEventListener('click', () => setChartRange(+b.dataset.range)));
+chartState.range = store.get('cf_chart_range', 252);
+
+// 분할 기준선(입력값)을 가로 점선으로 표시 — 입력을 바꾸면 따라 움직임
+function updateChartLevels() {
+  const s = chartState.series.candle;
+  if (!s || !chartState.sym || $('dca-ticker').value.trim().toUpperCase() !== chartState.sym) return;
+  chartState.lines.forEach(pl => s.removePriceLine(pl));
+  chartState.lines = [];
+  const LS = window.LightweightCharts.LineStyle;
+  [['dca-ma200', '1차 200일선', '#38bdf8'], ['dca-ma240', '2차 240일선', '#f59e0b'], ['dca-ma365', '3차 365일선', '#f43f5e'], ['dca-extreme', '4차 극단', '#a855f7']]
+    .forEach(([id, title, color]) => {
+      const price = parseFloat($(id).value);
+      if (price > 0) chartState.lines.push(s.createPriceLine({ price, color, lineWidth: 1, lineStyle: LS.Dashed, axisLabelVisible: true, title }));
+    });
+
+  const cur = parseFloat($('dca-current').value), st = D?.stocks?.[chartState.sym];
+  if (cur > 0 && st) {
+    const rel = (k, name) => st[k] ? `${name} ${pct((cur / st[k] - 1) * 100)}` : null;
+    const parts = [`52주 고점 ${usd(st.high52w)} 대비 <b class="${st.drawdown_from_high_pct <= -20 ? 'text-rose-300' : 'text-gray-100'}">${pct((cur / st.high52w - 1) * 100)}</b>`,
+      rel('sma200', '200일선'), rel('sma240', '240일선'), rel('sma365', '365일선')].filter(Boolean);
+    $('chart-position').innerHTML = `현재가 ${usd(cur)} · ` + parts.join(' · ');
+  }
+}
 
 // =====================================================================
 // 7. TAB 4 — 8단 시뮬레이션 (필드 정의 하나로 폼·저장·복사 모두 처리)

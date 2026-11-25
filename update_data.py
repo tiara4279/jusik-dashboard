@@ -148,14 +148,32 @@ def fred_latest(series_id, scale=1.0, digits=2):
 
 
 # ---------------------------------------------------------------- Yahoo
-def yahoo_closes(symbol, rng="3y"):
+HISTORY = {}          # 종목별 일봉 OHLCV (차트용, history.js로 저장)
+HISTORY_BARS = 900    # 차트 2년 + 365일선 계산에 필요한 앞부분
+
+
+def yahoo_chart(symbol, rng):
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.request.quote(symbol)}?range={rng}&interval=1d"
-    data = json.loads(http_get(url, UA_YAHOO))["chart"]["result"][0]
+    return json.loads(http_get(url, UA_YAHOO))["chart"]["result"][0]
+
+
+def yahoo_closes(symbol, rng="3y"):
+    data = yahoo_chart(symbol, rng)
     ts = data.get("timestamp") or []
     closes = data["indicators"]["quote"][0]["close"]
     pairs = [(t, c) for t, c in zip(ts, closes) if c is not None]
-    meta = data["meta"]
-    return pairs, meta
+    return pairs, data["meta"]
+
+
+def yahoo_ohlcv(symbol, rng="5y"):
+    data = yahoo_chart(symbol, rng)
+    q = data["indicators"]["quote"][0]
+    rows = [
+        (t, o, h, l, c, v)
+        for t, o, h, l, c, v in zip(data.get("timestamp") or [], q["open"], q["high"], q["low"], q["close"], q["volume"])
+        if None not in (o, h, l, c)
+    ]
+    return rows, data["meta"]
 
 
 def sma(values, n):
@@ -166,10 +184,19 @@ def sma(values, n):
 
 def stock_snapshot(symbol):
     try:
-        pairs, meta = yahoo_closes(symbol)
-        closes = [c for _, c in pairs]
+        rows, meta = yahoo_ohlcv(symbol)
+        closes = [r[4] for r in rows]
         price = meta.get("regularMarketPrice") or closes[-1]
-        last_ts = pairs[-1][0]
+        last_ts = rows[-1][0]
+        tail = rows[-HISTORY_BARS:]
+        HISTORY[symbol] = {
+            "t": [utc_date(r[0]) for r in tail],
+            "o": [round(r[1], 2) for r in tail],
+            "h": [round(r[2], 2) for r in tail],
+            "l": [round(r[3], 2) for r in tail],
+            "c": [round(r[4], 2) for r in tail],
+            "v": [int(r[5] or 0) for r in tail],
+        }
         high_252 = max(closes[-252:])
         ret_63 = round((closes[-1] / closes[-64] - 1) * 100, 2) if len(closes) > 64 else None
         return {
@@ -284,6 +311,21 @@ def main():
 
     js = "// 자동 생성 파일 — 직접 고치지 말고 update_data.py를 실행하세요.\nwindow.MARKET_DATA = " + json.dumps(out, ensure_ascii=False, indent=2) + ";\n"
     (BASE / "market_data.js").write_text(js, encoding="utf-8")
+
+    # 차트용 일봉 — 실패한 종목은 이전 파일의 값을 유지
+    hist_path = BASE / "history.json"
+    hist = {}
+    if hist_path.exists():
+        try:
+            hist = json.loads(hist_path.read_text(encoding="utf-8"))
+        except Exception:
+            hist = {}
+    hist.update(HISTORY)
+    hist = {k: v for k, v in hist.items() if k in stocks}
+    compact = json.dumps(hist, ensure_ascii=False, separators=(",", ":"))
+    hist_path.write_text(compact, encoding="utf-8")
+    (BASE / "history.js").write_text(
+        "// 자동 생성 파일 — 차트용 일봉 OHLCV\nwindow.MARKET_HISTORY = " + compact + ";\n", encoding="utf-8")
     prev_path.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")
 
     print(f"갱신 완료: {out['generatedAt']}  종목 {len(stocks)}개")

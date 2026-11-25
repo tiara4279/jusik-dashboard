@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>주식대시보드</title>
+  <meta name="apple-mobile-web-app-title" content="주식대시보드" />
+  <meta name="application-name" content="주식대시보드" />
+  <meta name="theme-color" content="#0b0f19" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%93%A1%3C/text%3E%3C/svg%3E" />
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Noto+Sans+KR:wght@400;500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    body { background:#0b0f19; color:#f3f4f6; font-family:'Noto Sans KR','Inter',sans-serif; }
+    .mono { font-family:'Inter',ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+    ::-webkit-scrollbar { width:6px; height:6px; }
+    ::-webkit-scrollbar-track { background:#0b0f19; }
+    ::-webkit-scrollbar-thumb { background:#1f2937; border-radius:9999px; }
+    input[type="range"] { accent-color:#38bdf8; }
+    .card { background:#111827; border:1px solid #1f2937; border-radius:1rem; }
+    .inset { background:#0b0f19; border:1px solid #1f2937; border-radius:.75rem; }
+    .field { background:#111827; border:1px solid #374151; border-radius:.5rem; padding:.45rem .7rem; color:#fff; width:100%; }
+    .field:focus { outline:none; border-color:#38bdf8; }
+    /* 상태 배지: data-state 하나로 색 결정 */
+    .badge { padding:.2rem .6rem; border-radius:.5rem; font-size:.75rem; font-weight:700; border:1px solid; white-space:nowrap; }
+    .badge[data-state="met"]  { background:rgba(16,185,129,.2); color:#6ee7b7; border-color:rgba(16,185,129,.4); }
+    .badge[data-state="near"] { background:rgba(245,158,11,.15); color:#fcd34d; border-color:rgba(245,158,11,.3); }
+    .badge[data-state="none"] { background:rgba(244,63,94,.15); color:#fda4af; border-color:rgba(244,63,94,.3); }
+    .badge[data-state="locked"] { background:#1f2937; color:#9ca3af; border-color:#374151; }
+    .badge[data-state="info"] { background:rgba(56,189,248,.15); color:#7dd3fc; border-color:rgba(56,189,248,.35); }
+    .tab-btn { background:#111827; color:#9ca3af; border:1px solid #1f2937; }
+    .tab-btn:hover { color:#e5e7eb; border-color:#374151; }
+    .tab-btn[aria-selected="true"] { background:rgba(56,189,248,.15); color:#7dd3fc; border-color:rgba(56,189,248,.4); font-weight:700; }
+    .chip { background:#0b0f19; color:#d1d5db; border:1px solid #1f2937; }
+    .chip[aria-pressed="true"] { background:rgba(56,189,248,.2); color:#7dd3fc; border-color:rgba(56,189,248,.4); font-weight:700; }
+    .src { font-size:10px; color:#6b7280; }
+    .stale { color:#fbbf24; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+<div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+<header class="sticky top-0 z-40 bg-[#0b0f19]/95 backdrop-blur-md border-b border-gray-800">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div class="space-y-1.5 min-w-0">
+        <h1 class="text-lg sm:text-xl font-extrabold tracking-tight text-white">
+          주식대시보드 <span class="text-xs font-medium text-gray-400 ml-1">자본 흐름 &amp; 바닥 관제 · US Equities</span>
+        </h1>
+        <div class="flex flex-wrap items-center gap-2">
+          <span id="live-status-pill" class="badge inline-flex items-center gap-2 rounded-full" data-state="none">
+            <span class="w-2 h-2 rounded-full bg-current animate-pulse"></span>
+            <span id="live-status-text">데이터 로딩 중…</span>
+          </span>
+          <span id="data-asof" class="text-[11px] text-gray-500 mono"></span>
+        </div>
+      </div>
+      <!-- 헤더 게이지: 탭 2 계산기의 실제 입력값을 그대로 반영 (별도 상태 없음) -->
+      <div class="card p-3 sm:px-4 lg:min-w-[400px]">
+        <div class="flex items-center justify-between text-xs font-semibold mb-1.5">
+          <span class="text-amber-400">🛡️ 백팀 <span id="header-white-pct" class="mono">–</span>%</span>
+          <span class="text-sky-400">⚔️ 청팀 <span id="header-blue-pct" class="mono">–</span>%</span>
+        </div>
+        <div class="w-full h-2.5 bg-gray-800 rounded-full overflow-hidden flex">
+          <div id="header-white-bar" class="bg-amber-400 transition-all duration-300" style="width:50%"></div>
+          <div id="header-blue-bar" class="bg-sky-400 transition-all duration-300" style="width:50%"></div>
+        </div>
+        <div id="header-rebalance-hint" class="text-[11px] mt-1.5 text-gray-400">내 포트폴리오 탭에서 금액을 입력하세요</div>
+      </div>
+    </div>
+
+    <nav class="mt-4 flex overflow-x-auto gap-2 pb-1" role="tablist" aria-label="관제 탭">
+      <button role="tab" data-tab="radar" class="tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap">
+        📡 시장 바닥 4단계 <span id="nav-readiness-badge" class="px-1.5 py-0.5 text-[10px] rounded-md bg-gray-800 text-gray-300 mono">0/4</span>
+      </button>
+      <button role="tab" data-tab="teams" class="tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap">⚔️ 청팀 · 백팀 50:50</button>
+      <button role="tab" data-tab="dca" class="tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap">🎯 200·240·365일선 10분할</button>
+      <button role="tab" data-tab="simulator" class="tab-btn flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm whitespace-nowrap">🧠 8단 시뮬레이션</button>
+    </nav>
+  </div>
+</header>
+
+<main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+  <div id="data-error" class="hidden mb-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-200"></div>
+
+  <!-- ================= TAB 1: 바닥 4단계 ================= -->
+  <section id="tab-radar" role="tabpanel" class="tab-panel space-y-6">
+    <div class="card p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+      <div class="space-y-2 max-w-3xl">
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="badge" data-state="info">실데이터 자동 판정 + 수동 확인</span>
+          <span id="sim-mode-flag" class="badge hidden" data-state="near">가정값 시뮬레이션 중</span>
+        </div>
+        <h2 class="text-xl sm:text-2xl font-bold text-white" id="radar-headline">–</h2>
+        <p class="text-xs sm:text-sm text-gray-400 leading-relaxed" id="radar-subtext"></p>
+      </div>
+      <div class="flex items-center gap-4 inset rounded-2xl p-4 shrink-0">
+        <div class="text-center">
+          <div class="text-xs text-gray-400 mb-1">연속 충족 단계</div>
+          <div class="text-3xl font-extrabold mono text-sky-400"><span id="radar-score-count">0</span><span class="text-lg text-gray-500"> / 4</span></div>
+          <div class="text-[10px] text-gray-500 mt-0.5">개별 충족 <span id="radar-raw-count" class="mono">0</span>개</div>
+        </div>
+        <div class="h-10 w-px bg-gray-800"></div>
+        <div>
+          <div class="text-xs text-gray-400 mb-1">권장 실행 스탠스</div>
+          <div id="radar-stance-badge" class="badge" data-state="near">–</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5" id="stage-grid"></div>
+
+    <div class="flex flex-wrap items-center justify-end gap-2">
+      <button id="btn-reset-live" class="text-xs px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300">↺ 가정값 지우고 실데이터로 복원</button>
+    </div>
+
+    <div class="card p-5 sm:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+        <div>
+          <h3 class="text-base sm:text-lg font-bold text-white">보조 유동성 &amp; 자본 이동 모니터</h3>
+          <p class="text-xs text-gray-400 mt-0.5">각 수치 아래에 출처와 기준일을 표시합니다. 기준일이 오래되면 노란색으로 경고합니다.</p>
+        </div>
+        <span id="rotation-badge" class="badge self-start sm:self-auto" data-state="near">–</span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5" id="liquidity-grid"></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 2: 청팀/백팀 ================= -->
+  <section id="tab-teams" role="tabpanel" class="tab-panel hidden space-y-6">
+    <div class="card p-5 sm:p-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+        <div>
+          <span class="text-xs font-bold text-sky-400">리밸런싱 계산기 · 입력값은 이 브라우저에만 저장됩니다</span>
+          <h2 class="text-lg sm:text-xl font-bold text-white mt-0.5">백팀(방어) ↔ 청팀(성장) 목표 비중 계산기</h2>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <label for="calc-target" class="text-gray-400">청팀 목표 비중</label>
+          <input id="calc-target" type="number" min="0" max="100" step="5" value="50" class="field mono w-20" />
+          <span class="text-gray-400">%</span>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 items-stretch">
+        <div class="inset p-4 border-amber-500/30">
+          <label for="calc-white-val" class="block text-xs font-bold text-amber-400 mb-1.5">🛡️ 백팀 평가금액 (USD)</label>
+          <input id="calc-white-val" type="number" value="60000" min="0" step="100" class="field mono font-bold" />
+          <p class="text-[11px] text-gray-400 mt-1.5">현금·T-bill·MMF·필수소비재·결제망</p>
+        </div>
+        <div class="inset p-4 border-sky-500/30">
+          <label for="calc-blue-val" class="block text-xs font-bold text-sky-400 mb-1.5">⚔️ 청팀 평가금액 (USD)</label>
+          <input id="calc-blue-val" type="number" value="40000" min="0" step="100" class="field mono font-bold" />
+          <p class="text-[11px] text-gray-400 mt-1.5">1군 양장우 · 2군 인데전 · 3군 보안/RWA</p>
+        </div>
+        <div class="inset p-4 space-y-2">
+          <div class="flex justify-between text-xs"><span class="text-gray-400">총 운용 자산</span><span class="mono font-bold" id="calc-total-val">–</span></div>
+          <div class="flex justify-between text-xs"><span class="text-gray-400">현재 비율 (백 : 청)</span><span class="mono font-bold" id="calc-ratio-text">–</span></div>
+          <div class="pt-2 border-t border-gray-800">
+            <div class="text-[11px] text-gray-400 mb-0.5">리밸런싱 지침</div>
+            <div id="calc-rebalance-action" class="text-xs sm:text-sm font-bold">–</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div class="card p-5 space-y-3 border-sky-500/30">
+        <h3 class="text-lg font-bold text-white">⚔️ 청팀 (미래 패권 · 성장)</h3>
+        <div id="blue-team-list" class="space-y-3"></div>
+      </div>
+      <div class="card p-5 space-y-3 border-amber-500/30">
+        <h3 class="text-lg font-bold text-white">🛡️ 백팀 (방어 금고 · 생존)</h3>
+        <div id="white-team-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+      </div>
+    </div>
+    <p class="text-[11px] text-gray-500">종목 옆 현재가·200일선 대비 위치는 market_data.js의 실데이터입니다. 감시 목록에 없는 종목은 가격이 표시되지 않습니다 (manual_inputs.json의 watchlist에 추가).</p>
+  </section>
+
+  <!-- ================= TAB 3: 10분할 ================= -->
+  <section id="tab-dca" role="tabpanel" class="tab-panel hidden space-y-6">
+    <div class="card p-5 sm:p-6 space-y-5">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div>
+          <span class="text-xs font-bold text-sky-400">일봉 · 거래일 기준 단순이동평균 (미국장 1년 ≈ 252거래일)</span>
+          <h2 class="text-lg sm:text-xl font-bold text-white mt-0.5">200 · 240 · 365일선 10분할 매수 &amp; 알림 설계기</h2>
+        </div>
+        <div class="flex flex-wrap gap-1.5" id="dca-presets"></div>
+      </div>
+
+      <div class="grid grid-cols-2 lg:grid-cols-7 gap-3 inset p-4">
+        <div class="col-span-2 lg:col-span-1">
+          <label for="dca-ticker" class="block text-[11px] font-semibold text-gray-400 mb-1">티커</label>
+          <input id="dca-ticker" type="text" class="field font-bold" />
+        </div>
+        <div><label for="dca-budget" class="block text-[11px] font-semibold text-gray-400 mb-1">배정 총액 ($)</label><input id="dca-budget" type="number" value="10000" min="0" step="100" class="field mono text-emerald-400 font-bold" /></div>
+        <div><label for="dca-current" class="block text-[11px] font-semibold text-gray-400 mb-1">현재가 ($)</label><input id="dca-current" type="number" min="0.01" step="0.01" class="field mono font-bold" /></div>
+        <div><label for="dca-ma200" class="block text-[11px] font-semibold text-sky-400 mb-1">200일선 (20%)</label><input id="dca-ma200" type="number" min="0.01" step="0.01" class="field mono text-sky-300 font-bold" /></div>
+        <div><label for="dca-ma240" class="block text-[11px] font-semibold text-amber-400 mb-1">240일선 (25%)</label><input id="dca-ma240" type="number" min="0.01" step="0.01" class="field mono text-amber-300 font-bold" /></div>
+        <div><label for="dca-ma365" class="block text-[11px] font-semibold text-rose-400 mb-1">365일선 (30%)</label><input id="dca-ma365" type="number" min="0.01" step="0.01" class="field mono text-rose-300 font-bold" /></div>
+        <div>
+          <label for="dca-extreme" class="block text-[11px] font-semibold text-purple-400 mb-1">극단 저점 (25%)</label>
+          <input id="dca-extreme" type="number" min="0.01" step="0.01" class="field mono text-purple-300 font-bold" />
+        </div>
+      </div>
+
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 inset px-4 py-3">
+        <div class="flex flex-wrap items-center gap-4 text-xs">
+          <label class="inline-flex items-center gap-2 text-gray-300 cursor-pointer">
+            <input id="dca-extreme-auto" type="checkbox" checked class="rounded" />
+            극단 저점 = 현재가 −<input id="dca-extreme-pct" type="number" value="40" min="5" max="90" class="field mono w-14 py-0.5 px-1.5 inline" />% 자동 계산
+          </label>
+          <label class="inline-flex items-center gap-2 text-gray-300 cursor-pointer">
+            <input id="dca-vol-spike" type="checkbox" class="rounded" />
+            365일선 부근 <strong class="text-emerald-400">거래량 급증(투항 매도)</strong> 확인됨
+          </label>
+        </div>
+        <button id="btn-copy-alert" class="px-4 py-2 rounded-xl text-xs font-bold bg-sky-500 hover:bg-sky-400 text-gray-950">📋 증권앱 알림 설정 요약 복사</button>
+      </div>
+
+      <div id="dca-warnings" class="hidden rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200 space-y-1"></div>
+
+      <div class="inset p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs">
+          <span class="font-bold text-gray-300">현재가 대비 이평선 이격도</span>
+          <span id="dca-data-src" class="src"></span>
+        </div>
+        <div id="dca-ladder-bars" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5"></div>
+        <div id="dca-summary" class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs"></div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left border-collapse text-xs sm:text-sm">
+          <thead>
+            <tr class="border-b border-gray-800 text-gray-400 text-xs">
+              <th class="py-2.5 px-3">회차</th><th class="py-2.5 px-3">구간</th><th class="py-2.5 px-3">트리거가</th>
+              <th class="py-2.5 px-3">예상 체결가</th><th class="py-2.5 px-3">현재가 대비</th><th class="py-2.5 px-3">비중</th>
+              <th class="py-2.5 px-3">투입 금액</th><th class="py-2.5 px-3">예상 수량</th><th class="py-2.5 px-3">누적 평단</th>
+            </tr>
+          </thead>
+          <tbody id="dca-table-body" class="divide-y divide-gray-800/70 mono text-xs"></tbody>
+        </table>
+      </div>
+      <p class="text-[11px] text-gray-500 leading-relaxed">
+        · 현재가가 이미 트리거가 아래면 예상 체결가 = 현재가로 계산합니다 (지정가가 아니라 시장가 체결 가정).<br/>
+        · 거래량 급증을 확인하지 않으면 6~8회차(365일선)는 "보류"로 두고 평단 계산에서 제외합니다.<br/>
+        · 예상 수량은 소수점 주식(fractional share)을 가정합니다. 정수 주만 가능한 증권사는 내림 처리하세요.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+      <div class="card p-4"><div class="font-extrabold text-sky-400 mb-1">원칙 1 · 속도 제한</div><p class="text-gray-300 leading-relaxed">종목당 최소 10분할, 주 1회, 최소 3개월에 걸쳐 평단을 낮춥니다.</p></div>
+      <div class="card p-4"><div class="font-extrabold text-rose-400 mb-1">원칙 2 · 추격 매수 금지</div><p class="text-gray-300 leading-relaxed">기준선까지 오지 않고 반등하면 쫓지 않고 남은 현금은 보관합니다.</p></div>
+      <div class="card p-4"><div class="font-extrabold text-amber-400 mb-1">원칙 3 · 차트 단순화</div><p class="text-gray-300 leading-relaxed">200·240·365일선과 거래량 외 보조지표는 제거합니다.</p></div>
+      <div class="card p-4"><div class="font-extrabold text-emerald-400 mb-1">원칙 4 · 세포분열</div><p class="text-gray-300 leading-relaxed">수익 시 50% 단위 분할 익절, 원금 초과분은 백팀 금고로 옮깁니다.</p></div>
+    </div>
+  </section>
+
+  <!-- ================= TAB 4: 8단 시뮬레이션 ================= -->
+  <section id="tab-simulator" role="tabpanel" class="tab-panel hidden space-y-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="lg:col-span-2 card p-5 sm:p-6 space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-800 pb-4">
+          <div>
+            <span class="text-xs font-bold text-amber-400">라자냐 레이어 사고 알고리즘</span>
+            <h2 class="text-lg sm:text-xl font-bold text-white mt-0.5">시장 충격 8단 시뮬레이션 훈련기</h2>
+          </div>
+          <div class="flex flex-wrap gap-1.5">
+            <button data-sim-preset="ai_crash" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold chip">예시 1: AI 거품론 급락</button>
+            <button data-sim-preset="rates" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold chip">예시 2: 장기금리 급등</button>
+            <button id="btn-sim-clear" class="px-2.5 py-1.5 rounded-lg text-xs font-semibold chip">비우기</button>
+          </div>
+        </div>
+        <div id="sim-form" class="grid grid-cols-1 sm:grid-cols-2 gap-3.5"></div>
+        <div class="flex flex-wrap items-center justify-end gap-2.5">
+          <button id="btn-sim-copy" class="px-4 py-2.5 rounded-xl text-xs font-bold bg-gray-800 hover:bg-gray-700 text-gray-200">📋 분석 리포트 복사</button>
+          <button id="btn-sim-save" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-400 text-gray-950">💾 기록함에 저장</button>
+        </div>
+      </div>
+      <div class="card p-5 flex flex-col justify-between">
+        <div class="space-y-4">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-3">
+            <div>
+              <h3 class="text-base font-bold text-white">시뮬레이션 기록함</h3>
+              <p class="text-[11px] text-gray-400">이 브라우저에만 보관됩니다 (다른 기기와 공유 안 됨)</p>
+            </div>
+            <span id="sim-log-count" class="px-2 py-0.5 rounded-md text-xs mono font-bold bg-gray-800 text-sky-400">0건</span>
+          </div>
+          <div id="sim-logs-list" class="space-y-3 max-h-[540px] overflow-y-auto pr-1"></div>
+        </div>
+        <div class="pt-4 mt-4 border-t border-gray-800 text-[11px] text-gray-500 leading-relaxed">
+          💡 대중과 반대 결론이 나와도 틀린 것이 아니라 출발선이 다르다는 신호입니다. 감정을 분리하고 구조 위에서 판정하세요.
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="border-t border-gray-800/80 py-5 px-4 sm:px-6 lg:px-8 mt-8">
+  <div class="max-w-7xl mx-auto text-xs text-gray-500 space-y-1">
+    <p>※ 투자 판단을 돕기 위한 개인용 참고 도구이며 투자 권유가 아닙니다. 최종 결정과 책임은 본인에게 있습니다.</p>
+    <p>데이터: FRED(세인트루이스 연준), Yahoo Finance, ICI, FINRA. 시세는 지연될 수 있으며 <code>update_data.py</code>를 실행한 시점 기준입니다.</p>
+  </div>
+</footer>
+
+<!-- 실데이터 (update_data.py가 생성) -->
+<script src="market_data.js"></script>
+<script>
+"use strict";
+
+// =====================================================================
+// 0. 판정 규칙 — 숫자 기준은 전부 여기서만 바꿉니다
+// =====================================================================
+const RULES = {
+  vixPeak: 45,            // 1단계: 최근 60거래일 VIX 종가 최고치가 이 값 이상
+  vixReversalPct: 15,     // 1단계: 그 최고치 대비 현재 VIX가 이만큼(%) 이상 하락하면 "급락 전환"
+  vixNear: 30,            // 1단계 근접 표시
+  hyCrisis: 9.0,          // 2단계: ICE BofA US HY OAS (%)
+  hyWarn: 6.0,            // 2단계 경계 표시
+  insiderRatioNear: 0.25, // 3단계 근접: 매수/매도 비율
+  fedCutBp: 25,           // 4단계 자동 힌트: 3개월간 EFFR 인하폭(bp)
+  reservesFloorT: 2.5,    // 은행 준비금 하한 참고선 ($T)
+  staleDays: { daily: 5, weekly: 14, monthly: 70 },
+};
+const D = window.MARKET_DATA || null;
+
+// =====================================================================
+// 1. 공통 유틸
+// =====================================================================
+const $ = (id) => document.getElementById(id);
+const fmt = (n, d = 2) => (n == null || isNaN(n) ? '–' : Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }));
+const usd = (n, d = 2) => (n == null || isNaN(n) ? '–' : '$' + fmt(n, d));
+const pct = (n, d = 1) => (n == null || isNaN(n) ? '–' : (n > 0 ? '+' : '') + fmt(n, d) + '%');
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function daysSince(iso) {
+  if (!iso) return Infinity;
+  return Math.floor((Date.now() - new Date(iso + 'T00:00:00').getTime()) / 86400000);
+}
+function srcLine(obj, freq) {
+  if (!obj) return '<span class="src stale">데이터 없음</span>';
+  const old = daysSince(obj.asOf) > RULES.staleDays[freq] || obj.stale;
+  return `<span class="src ${old ? 'stale' : ''}">${esc(obj.source || '')} · ${esc(obj.asOf || '')}${old ? ' · 오래된 값' : ''}</span>`;
+}
+
+const store = {
+  get(key, fallback) { try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v); } catch { return fallback; } },
+  set(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch { return false; } },
+};
+
+function showToast(message, type = 'info') {
+  const colors = { info: 'border-sky-500/40 text-sky-200', success: 'border-emerald-500/40 text-emerald-200', warn: 'border-amber-500/40 text-amber-200' };
+  const t = document.createElement('div');
+  t.className = `pointer-events-auto px-4 py-3 rounded-xl border bg-gray-900 text-xs font-semibold shadow-2xl transition-all duration-300 translate-y-2 opacity-0 ${colors[type] || colors.info}`;
+  t.textContent = message;
+  $('toast-container').appendChild(t);
+  requestAnimationFrame(() => t.classList.remove('translate-y-2', 'opacity-0'));
+  setTimeout(() => { t.classList.add('translate-y-2', 'opacity-0'); setTimeout(() => t.remove(), 300); }, 3000);
+}
+
+async function copyText(text, okMsg) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return showToast(okMsg, 'success');
+  } catch { /* file:// 등에서 막히면 아래 방식으로 */ }
+  const ta = Object.assign(document.createElement('textarea'), { value: text });
+  ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  const ok = document.execCommand('copy');
+  ta.remove();
+  showToast(ok ? okMsg : '복사에 실패했습니다. 직접 선택해 복사해 주세요.', ok ? 'success' : 'warn');
+}
+
+// =====================================================================
+// 2. 탭
+// =====================================================================
+function switchTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== `tab-${tab}`));
+  document.querySelectorAll('[role="tab"]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+  store.set('cf_tab', tab);
+}
+document.querySelectorAll('[role="tab"]').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
+
+// =====================================================================
+// 3. 데이터 상태 표시
+// =====================================================================
+function renderDataStatus() {
+  const box = $('data-error');
+  if (!D) {
+    box.innerHTML = '<b>market_data.js를 찾지 못했습니다.</b> 같은 폴더에서 <code>python update_data.py</code>를 실행한 뒤 새로고침하세요. 지금은 모든 실데이터 칸이 비어 있습니다.';
+    box.classList.remove('hidden');
+    $('data-asof').textContent = '실데이터 없음';
+    return;
+  }
+  $('data-asof').textContent = `데이터 갱신: ${D.generatedAt.replace('T', ' ')} (시장 기준일 ${D.vix?.asOf || D.macro?.sp500?.asOf || '–'})`;
+  const stale = daysSince(D.generatedAt.slice(0, 10)) > 3;
+  const msgs = [];
+  if (stale) msgs.push(`데이터가 ${daysSince(D.generatedAt.slice(0, 10))}일 전 것입니다. <code>python update_data.py</code>로 갱신하세요.`);
+  if (D.errors?.length) msgs.push('수집 실패: ' + D.errors.map(esc).join(' / '));
+  if (msgs.length) { box.innerHTML = msgs.join('<br/>'); box.classList.remove('hidden'); }
+}
+
+// =====================================================================
+// 4. TAB 1 — 바닥 4단계 (순차 판정)
+//    · 각 단계는 실데이터로 자동 판정하고, 정성 조건은 체크박스로 확인
+//    · "연속 충족 단계" = 1단계부터 끊기지 않고 충족된 개수. 이것이 스탠스를 결정
+// =====================================================================
+const liveRadar = () => ({
+  vix: D?.vix?.value ?? null,
+  vixPeak: D?.vix?.peak_60d_close ?? null,
+  hy: D?.macro?.hy_oas?.value ?? null,
+});
+let radar = { ...liveRadar(), ...store.get('cf_radar_override', {}) };
+const checks = store.get('cf_radar_checks', { hyHeadline: false, insiderSurge: false, fedPivot: false });
+
+function insiderRatio() {
+  const i = D?.manual?.insider;
+  return i && i.sell_billion ? i.buy_billion / i.sell_billion : null;
+}
+function fedCutBp() {
+  const e = D?.macro?.effr;
+  return e && e.value_3m_ago != null ? Math.round((e.value_3m_ago - e.value) * 100) : null;
+}
+
+const STAGES = [
+  {
+    no: 1, tag: '1차 스타트', title: `VIX ${RULES.vixPeak}+ 급등 후 급락 전환`,
+    evaluate() {
+      const { vix, vixPeak } = radar;
+      if (vix == null || vixPeak == null) return { state: 'none', label: '데이터 없음', action: '–' };
+      const fromPeak = (vix / vixPeak - 1) * 100;
+      const met = vixPeak >= RULES.vixPeak && fromPeak <= -RULES.vixReversalPct;
+      if (met) return { state: 'met', label: '충족', action: '1차 정찰·분할 스타트' };
+      if (vixPeak >= RULES.vixPeak) return { state: 'near', label: '정점 형성', action: `꺾임 대기 (고점 대비 ${pct(fromPeak)})` };
+      if (Math.max(vix, vixPeak) >= RULES.vixNear) return { state: 'near', label: '미충족 (근접)', action: `${RULES.vixPeak} 돌파 감시` };
+      return { state: 'none', label: '미충족', action: '대기 (평온 구간)' };
+    },
+    body() {
+      const v = D?.vix;
+      return `현재 VIX <b class="text-gray-200 mono">${fmt(radar.vix)}</b>, 최근 60거래일 종가 최고 <b class="text-gray-200 mono">${fmt(radar.vixPeak)}</b>${v?.peak_60d_date ? ` (${esc(v.peak_60d_date)})` : ''}.
+        조건: 최고치 ≥ ${RULES.vixPeak} 이고 현재가 그 최고치보다 ${RULES.vixReversalPct}% 이상 낮을 것.`;
+    },
+    controls() {
+      return `
+        ${slider('vix', '현재 VIX (가정)', 10, 80, 0.1, radar.vix)}
+        ${slider('vixPeak', '최근 60일 최고 (가정)', 10, 90, 0.1, radar.vixPeak)}
+        <div>${srcLine(D?.vix, 'daily')}</div>`;
+    },
+  },
+  {
+    no: 2, tag: '2차 스타트', title: `HY 스프레드 ${RULES.hyCrisis}% 돌파 + 종말론 확산`,
+    evaluate() {
+      const hy = radar.hy;
+      if (hy == null) return { state: 'none', label: '데이터 없음', action: '–' };
+      if (hy >= RULES.hyCrisis && checks.hyHeadline) return { state: 'met', label: '충족', action: '2차 공포 투항 매수' };
+      if (hy >= RULES.hyCrisis) return { state: 'near', label: '수치 충족', action: '헤드라인 확인 필요' };
+      if (hy >= RULES.hyWarn) return { state: 'near', label: '경계', action: '신용 경색 관찰' };
+      return { state: 'none', label: '미충족', action: '대기' };
+    },
+    body() {
+      const c = D?.macro?.ccc_oas, h = D?.macro?.hy_oas;
+      return `ICE BofA 미국 하이일드 OAS <b class="text-gray-200 mono">${fmt(radar.hy)}%</b>
+        ${h?.value_3m_ago != null ? `(3개월 전 ${fmt(h.value_3m_ago)}%)` : ''}, CCC 이하 <b class="text-rose-300 mono">${fmt(c?.value)}%</b>.`;
+    },
+    controls() {
+      return `
+        ${slider('hy', 'HY 스프레드 % (가정)', 2.5, 15, 0.01, radar.hy)}
+        ${checkbox('hyHeadline', '시스템 붕괴 종말론 헤드라인 확산 (직접 판단)')}
+        <div>${srcLine(D?.macro?.hy_oas, 'daily')}</div>`;
+    },
+  },
+  {
+    no: 3, tag: '3차 스타트', title: 'SEC Form 4 내부자 매수 폭증',
+    evaluate() {
+      const r = insiderRatio();
+      if (checks.insiderSurge) return { state: 'met', label: '충족', action: '3차 스마트머니 동승' };
+      if (r != null && r >= RULES.insiderRatioNear) return { state: 'near', label: '근접', action: '종목별 Form 4 확인' };
+      return { state: 'none', label: '미충족', action: '알림 세팅 후 대기' };
+    },
+    body() {
+      const i = D?.manual?.insider, r = insiderRatio();
+      return i ? `최근 90일 내부자 매수 <b class="text-gray-200 mono">$${fmt(i.buy_billion, 3)}B</b> vs 매도 <b class="text-gray-200 mono">$${fmt(i.sell_billion, 2)}B</b>
+        → 매수/매도 <b class="mono">${fmt(r * 100, 1)}%</b>. 자동 수집이 안 되는 항목이라 manual_inputs.json에서 직접 갱신합니다.` : '내부자 데이터 없음';
+    },
+    controls() {
+      const i = D?.manual?.insider;
+      return `${checkbox('insiderSurge', '시장 전반 내부자 매수 폭증 확인 (직접 판단)')}
+        <div>${srcLine(i ? { source: i.source, asOf: i.asOf } : null, 'weekly')}</div>`;
+    },
+  },
+  {
+    no: 4, tag: '4차 공격 진입', title: '연준 정책 전환 (인하 · 유동성 공급)',
+    evaluate() {
+      if (checks.fedPivot) return { state: 'met', label: '충족', action: '인데전 → 양장우 순차 공격' };
+      const bp = fedCutBp();
+      if (bp != null && bp >= RULES.fedCutBp) return { state: 'near', label: '인하 진행', action: '전환 선언 여부 확인' };
+      return { state: 'none', label: '미충족', action: '공격 매수 보류' };
+    },
+    body() {
+      const e = D?.macro?.effr, t = D?.macro?.us10y, bp = fedCutBp();
+      return `EFFR <b class="text-gray-200 mono">${fmt(e?.value)}%</b>${bp != null ? ` (3개월간 ${bp > 0 ? `${bp}bp 하락` : bp < 0 ? `${-bp}bp 상승` : '변동 없음'})` : ''},
+        미 10년물 <b class="text-gray-200 mono">${fmt(t?.value)}%</b>${t?.value_3m_ago != null ? ` (3개월 전 ${fmt(t.value_3m_ago)}%)` : ''}.
+        금리 인하폭은 자동 힌트일 뿐, 정책 전환 선언은 직접 확인합니다.`;
+    },
+    controls() {
+      return `${checkbox('fedPivot', '금리 인하 / 자산 매입 / 유동성 공급 전환 확인')}
+        <div>${srcLine(D?.macro?.effr, 'daily')}</div>`;
+    },
+  },
+];
+
+function slider(key, label, min, max, step, val) {
+  return `<div>
+    <div class="flex items-center justify-between text-xs mb-1"><label for="r-${key}" class="text-gray-400">${label}</label><span class="mono font-bold text-white" id="r-${key}-out">${fmt(val)}</span></div>
+    <input id="r-${key}" data-radar="${key}" type="range" min="${min}" max="${max}" step="${step}" value="${val ?? min}" class="w-full h-1.5 cursor-pointer" ${val == null ? 'disabled' : ''}/>
+  </div>`;
+}
+function checkbox(key, label) {
+  return `<label class="inline-flex items-center gap-2 text-xs text-gray-300 cursor-pointer"><input type="checkbox" data-check="${key}" ${checks[key] ? 'checked' : ''} class="rounded"/> ${label}</label>`;
+}
+
+function buildStageCards() {
+  $('stage-grid').innerHTML = STAGES.map(s => `
+    <div class="card p-5 flex flex-col justify-between gap-4" id="stage-card-${s.no}">
+      <div>
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <div>
+            <span class="text-xs font-bold text-sky-400">${s.no}단계 · ${s.tag}</span>
+            <h3 class="text-base sm:text-lg font-bold text-white mt-0.5">${esc(s.title)}</h3>
+          </div>
+          <span id="stage-badge-${s.no}" class="badge shrink-0" data-state="none">–</span>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed" id="stage-body-${s.no}"></p>
+      </div>
+      <div class="inset p-3.5 space-y-2.5">
+        ${s.controls()}
+        <div class="text-right"><span id="stage-action-${s.no}" class="text-[11px] font-semibold text-gray-300"></span></div>
+      </div>
+    </div>`).join('');
+
+  document.querySelectorAll('[data-radar]').forEach(el => el.addEventListener('input', () => {
+    radar[el.dataset.radar] = parseFloat(el.value);
+    const live = liveRadar();
+    const overrides = {};
+    for (const k of Object.keys(live)) if (radar[k] !== live[k]) overrides[k] = radar[k];
+    store.set('cf_radar_override', overrides);
+    updateRadar();
+  }));
+  document.querySelectorAll('[data-check]').forEach(el => el.addEventListener('change', () => {
+    checks[el.dataset.check] = el.checked;
+    store.set('cf_radar_checks', checks);
+    updateRadar();
+  }));
+}
+
+function updateRadar() {
+  const results = STAGES.map(s => s.evaluate());
+  let consecutive = 0;
+  for (const r of results) { if (r.state === 'met') consecutive++; else break; }
+  const raw = results.filter(r => r.state === 'met').length;
+
+  STAGES.forEach((s, i) => {
+    const r = results[i];
+    const blocked = r.state === 'met' && i > consecutive; // 앞 단계가 안 됐는데 뒤 단계만 충족
+    const badge = $(`stage-badge-${s.no}`);
+    badge.dataset.state = blocked ? 'locked' : r.state;
+    badge.textContent = blocked ? `${r.label} (선행 단계 대기)` : r.label;
+    $(`stage-action-${s.no}`).textContent = blocked ? `${consecutive + 1}단계 충족 전까지 보류` : r.action;
+    $(`stage-body-${s.no}`).innerHTML = s.body();
+  });
+  ['vix', 'vixPeak', 'hy'].forEach(k => { const o = $(`r-${k}-out`); if (o) o.textContent = fmt(radar[k]); });
+
+  const live = liveRadar();
+  const simulating = Object.keys(live).some(k => radar[k] !== live[k]);
+  $('sim-mode-flag').classList.toggle('hidden', !simulating);
+
+  $('radar-score-count').textContent = consecutive;
+  $('radar-raw-count').textContent = raw;
+  $('nav-readiness-badge').textContent = `${consecutive}/4`;
+
+  const STANCE = [
+    { state: 'near', badge: '현금 · 백팀 방어 유지', head: '바닥 조건 미충족 — 방어 유지 구간' },
+    { state: 'info', badge: '1단계 — 정찰 분할 개시', head: '1차 바닥 신호 — 이평선 도달 종목만 소량 분할' },
+    { state: 'info', badge: '2단계 — 10분할 본격 진행', head: '신용 공포 정점 신호 — 기계적 10분할 진행' },
+    { state: 'met', badge: '3단계 — 청팀 비중 확대', head: '스마트머니 동승 — 청팀 비중 확대 구간' },
+    { state: 'met', badge: '4단계 — 공격 진입', head: '정책 전환 확인 — 인데전 선봉 · 양장우 순차 공격' },
+  ][consecutive];
+
+  $('radar-stance-badge').dataset.state = STANCE.state;
+  $('radar-stance-badge').textContent = STANCE.badge;
+  $('radar-headline').textContent = (simulating ? '[가정] ' : '') + STANCE.head;
+
+  const v = radar.vix, hy = radar.hy, t10 = D?.macro?.us10y?.value, nq = D?.macro?.nasdaq;
+  const nqChg = nq && nq.prev ? (nq.value / nq.prev - 1) * 100 : null;
+  $('radar-subtext').innerHTML = `VIX ${fmt(v)} · HY ${fmt(hy)}% · 10년물 ${fmt(t10)}% · 나스닥 전일 대비 ${pct(nqChg, 2)}.
+    개별 충족 ${raw}개 중 1단계부터 이어진 것은 ${consecutive}개입니다. 스탠스는 연속 충족 단계로만 정합니다.`;
+
+  const pill = $('live-status-pill');
+  pill.dataset.state = STANCE.state === 'near' ? 'none' : STANCE.state;
+  $('live-status-text').textContent = `${simulating ? '[가정] ' : ''}바닥 ${consecutive}/4 · ${STANCE.badge} (VIX ${fmt(v)})`;
+}
+
+$('btn-reset-live').addEventListener('click', () => {
+  radar = liveRadar();
+  store.set('cf_radar_override', {});
+  buildStageCards(); updateRadar();
+  showToast('실데이터 값으로 되돌렸습니다.', 'info');
+});
+
+function renderLiquidity() {
+  const m = D?.macro || {}, man = D?.manual || {};
+  const res = m.reserves_trillion, rrp = m.rrp_billion, mmf = man.mmf, mg = man.margin;
+  const rot = D?.rotation || {};
+  const xlp = rot.defensive, lux = rot.luxury;
+  const spread = xlp?.ret_3m_pct != null && lux?.ret_3m_pct != null ? lux.ret_3m_pct - xlp.ret_3m_pct : null;
+
+  const tiles = [
+    { label: '은행 준비금 (WRESBAL)', val: res ? `$${fmt(res.value, 2)}T` : '–', note: res ? (res.value >= RULES.reservesFloorT ? `참고 하한 $${RULES.reservesFloorT}T 위` : `참고 하한 $${RULES.reservesFloorT}T 아래`) : '', src: srcLine(res, 'weekly') },
+    { label: '역레포 잔액 (RRP)', val: rrp ? `$${fmt(rrp.value, 2)}B` : '–', note: rrp && rrp.value < 50 ? '사실상 고갈 (완충 여력 소진)' : '', src: srcLine(rrp, 'daily') },
+    { label: 'MMF 총자산 (수동)', val: mmf ? `$${fmt(mmf.value, 2)}T` : '–', note: '대기 현금', src: srcLine(mmf, 'weekly'), cls: 'text-amber-300' },
+    { label: '마진데트 (수동)', val: mg ? `$${fmt(mg.value, 2)}T` : '–', note: mg?.to_m2_pct != null ? `M2 대비 ${fmt(mg.to_m2_pct)}%` : '', src: srcLine(mg, 'monthly'), cls: 'text-rose-400' },
+    { label: `필수소비재 vs 명품 (3개월 수익률)`, val: `${xlp?.symbol || 'XLP'} ${pct(xlp?.ret_3m_pct)} / ${lux?.symbol || 'LVMUY'} ${pct(lux?.ret_3m_pct)}`, note: spread == null ? '' : spread > 0 ? '명품 우위 → 위험선호 회복 신호' : '방어 우위 → 방어 선호 지속', src: srcLine(xlp ? { source: 'Yahoo', asOf: xlp.asOf } : null, 'daily'), small: true },
+  ];
+  $('liquidity-grid').innerHTML = tiles.map(t => `
+    <div class="inset p-3.5 space-y-1">
+      <div class="text-[11px] text-gray-400">${t.label}</div>
+      <div class="${t.small ? 'text-xs' : 'text-lg'} font-extrabold mono ${t.cls || 'text-white'}">${t.val}</div>
+      <div class="text-[11px] text-gray-300">${t.note}</div>
+      <div>${t.src}</div>
+    </div>`).join('');
+
+  const rb = $('rotation-badge');
+  if (spread == null) { rb.dataset.state = 'locked'; rb.textContent = '자본 위치: 데이터 없음'; }
+  else if (spread > 0) { rb.dataset.state = 'info'; rb.textContent = '자본 위치: 청팀 쪽으로 이동 조짐'; }
+  else { rb.dataset.state = 'near'; rb.textContent = '자본 위치: 백팀(방어) 머무름'; }
+}
+
+// =====================================================================
+// 5. TAB 2 — 포트폴리오 (헤더 게이지의 유일한 데이터 원천)
+// =====================================================================
+const pf = store.get('cf_portfolio', { white: 60000, blue: 40000, target: 50 });
+$('calc-white-val').value = pf.white; $('calc-blue-val').value = pf.blue; $('calc-target').value = pf.target;
+
+function updatePortfolio() {
+  const white = Math.max(0, parseFloat($('calc-white-val').value) || 0);
+  const blue = Math.max(0, parseFloat($('calc-blue-val').value) || 0);
+  const target = Math.min(100, Math.max(0, parseFloat($('calc-target').value) || 0));
+  store.set('cf_portfolio', { white, blue, target });
+  const total = white + blue;
+  $('calc-total-val').textContent = usd(total, 0);
+  const act = $('calc-rebalance-action'), hint = $('header-rebalance-hint');
+
+  if (total === 0) {
+    $('calc-ratio-text').textContent = '–';
+    act.textContent = '금액을 입력하면 리밸런싱 금액이 계산됩니다.'; act.className = 'text-xs sm:text-sm font-bold text-gray-400';
+    $('header-white-pct').textContent = $('header-blue-pct').textContent = '–';
+    hint.textContent = '포트폴리오 금액 미입력';
+    return;
+  }
+  const bluePct = blue / total * 100, whitePct = 100 - bluePct;
+  $('calc-ratio-text').textContent = `${fmt(whitePct, 1)}% : ${fmt(bluePct, 1)}%`;
+  $('header-white-pct').textContent = fmt(whitePct, 1); $('header-blue-pct').textContent = fmt(bluePct, 1);
+  $('header-white-bar').style.width = `${whitePct}%`; $('header-blue-bar').style.width = `${bluePct}%`;
+
+  const move = total * target / 100 - blue; // +면 백→청, -면 청→백
+  const label = `${100 - target}:${target}`;
+  if (Math.abs(move) < Math.max(1, total * 0.005)) {
+    act.textContent = `목표 비중(백:청 ${label}) 유지 중입니다.`; act.className = 'text-xs sm:text-sm font-bold text-emerald-400';
+    hint.textContent = `목표 ${label} 유지 중`; hint.className = 'text-[11px] mt-1.5 text-emerald-400';
+  } else if (move > 0) {
+    act.textContent = `백팀에서 ${usd(move, 0)}를 청팀으로 옮기면 백:청 ${label}이 됩니다. (10분할 계획에 따라 나눠서 집행)`;
+    act.className = 'text-xs sm:text-sm font-bold text-sky-400';
+    hint.textContent = `백 → 청 ${usd(move, 0)} 이동 필요`; hint.className = 'text-[11px] mt-1.5 font-bold text-sky-400';
+  } else {
+    act.textContent = `청팀에서 ${usd(-move, 0)}를 익절해 백팀으로 옮기면 백:청 ${label}이 됩니다.`;
+    act.className = 'text-xs sm:text-sm font-bold text-amber-400';
+    hint.textContent = `청 → 백 ${usd(-move, 0)} 보관 필요`; hint.className = 'text-[11px] mt-1.5 font-bold text-amber-400';
+  }
+}
+['calc-white-val', 'calc-blue-val', 'calc-target'].forEach(id => $(id).addEventListener('input', updatePortfolio));
+
+const BLUE_TEAM = [
+  { tier: '1군 · 양장우 (양자·장수·우주)', color: 'text-sky-300', groups: [
+    { name: '양자컴퓨터', tickers: ['IONQ', 'RGTI', 'IBM', 'GOOGL'] },
+    { name: '장수과학 · 바이오', tickers: ['CRSP', 'MRNA', 'UNH'] },
+    { name: '우주 · 방산', tickers: ['RKLB', 'LMT', 'NOC'] } ] },
+  { tier: '2군 · 인데전 (AI·데이터·전력) — 랠리 선봉', color: 'text-emerald-400', groups: [
+    { name: 'AI · 반도체 · 데이터', tickers: ['NVDA', 'TSM', 'AVGO', 'MSFT', 'GOOGL'] },
+    { name: '전력망 · 에너지 · ESS', tickers: ['GEV', 'NEE', 'SMR'] } ] },
+  { tier: '3군 · 보안 · 금융재편', color: 'text-purple-300', groups: [
+    { name: '군사 · 사이버보안', tickers: ['PLTR', 'CRWD'] },
+    { name: '자산토큰화(RWA)', tickers: ['BLK', 'BEN', 'IBIT'] } ] },
+];
+const WHITE_TEAM = [
+  { name: '필수소비재', tickers: ['KO', 'PG', 'PEP'], note: '폭락장 방패' },
+  { name: '결제망', tickers: ['V', 'MA', 'AXP'], note: '현금흐름 독점' },
+  { name: '물 · 위생 인프라', tickers: ['AWK', 'XYL', 'ECL'], note: '생존 필수' },
+  { name: '거대 금융기관', tickers: ['JPM', 'GS', 'BLK'], note: '자본 흐름 설계자' },
+  { name: '명품 (선행 지표)', tickers: ['LVMUY'], note: '반등 시 청팀 전환 신호' },
+  { name: '안전자산 · 실탄', tickers: ['SGOV', 'BIL', 'GLD'], note: 'T-bill·금 = 저점 매수용' },
+];
+
+function tickerChip(sym) {
+  const s = D?.stocks?.[sym] || (D?.rotation?.luxury?.symbol === sym ? D.rotation.luxury : null) || (D?.rotation?.defensive?.symbol === sym ? D.rotation.defensive : null);
+  if (!s) return `<span class="mono text-sky-400 font-semibold">${sym}</span>`;
+  const vs200 = s.sma200 ? (s.price / s.sma200 - 1) * 100 : null;
+  return `<span class="mono text-sky-400 font-semibold" title="${esc(s.name)} · 기준 ${esc(s.asOf)}">${sym}
+    <span class="text-gray-300 font-normal">${usd(s.price)}</span>
+    <span class="${vs200 != null && vs200 < 0 ? 'text-emerald-400' : 'text-gray-500'} font-normal text-[10px]">${vs200 == null ? '' : `200일선 ${pct(vs200)}`}</span></span>`;
+}
+function renderTeams() {
+  $('blue-team-list').innerHTML = BLUE_TEAM.map(t => `
+    <div class="inset p-4 space-y-2">
+      <div class="text-xs font-extrabold ${t.color}">${t.tier}</div>
+      ${t.groups.map(g => `<div class="text-xs"><div class="font-bold text-white mb-0.5">${g.name}</div><div class="flex flex-wrap gap-x-3 gap-y-1">${g.tickers.map(tickerChip).join('')}</div></div>`).join('')}
+    </div>`).join('');
+  $('white-team-list').innerHTML = WHITE_TEAM.map(g => `
+    <div class="inset p-3.5 text-xs space-y-1">
+      <div class="flex justify-between"><span class="font-bold text-amber-300">${g.name}</span><span class="text-[10px] text-gray-400">${g.note}</span></div>
+      <div class="flex flex-wrap gap-x-3 gap-y-1">${g.tickers.map(tickerChip).join('')}</div>
+    </div>`).join('');
+}
+
+// =====================================================================
+// 6. TAB 3 — 10분할
+// =====================================================================
+const TRANCHES = [
+  // [회차, 구간, 기준선 키, 기준선 대비 배율, 비중]
+  [1, '1차 · 200일선 (1/2)', 'ma200', 1.00, 0.10],
+  [2, '1차 · 200일선 (2/2)', 'ma200', 0.97, 0.10],
+  [3, '2차 · 240일선 (1/3)', 'ma240', 1.00, 0.25 / 3],
+  [4, '2차 · 240일선 (2/3)', 'ma240', 0.96, 0.25 / 3],
+  [5, '2차 · 240일선 (3/3)', 'ma240', 0.92, 0.25 / 3],
+  [6, '3차 · 365일선+거래량 (1/3)', 'ma365', 1.00, 0.10],
+  [7, '3차 · 365일선+거래량 (2/3)', 'ma365', 0.95, 0.10],
+  [8, '3차 · 365일선+거래량 (3/3)', 'ma365', 0.90, 0.10],
+  [9, '4차 · 극단 저점 (1/2)', 'extreme', 1.00, 0.125],
+  [10, '4차 · 극단 저점 (2/2)', 'extreme', 0.90, 0.125],
+];
+const STAGE_COLOR = { ma200: 'text-sky-300', ma240: 'text-amber-300', ma365: 'text-rose-300', extreme: 'text-purple-300' };
+let currentSymbol = null;
+
+function renderDcaPresets() {
+  const syms = Object.keys(D?.stocks || {});
+  $('dca-presets').innerHTML = syms.length
+    ? syms.map(s => `<button data-sym="${s}" aria-pressed="false" class="chip px-3 py-1.5 rounded-lg text-xs">${s}</button>`).join('')
+    : '<span class="text-xs text-gray-500">실데이터 없음 — 값을 직접 입력하세요</span>';
+  document.querySelectorAll('[data-sym]').forEach(b => b.addEventListener('click', () => loadDcaSymbol(b.dataset.sym, true)));
+}
+
+function loadDcaSymbol(sym, toast) {
+  const s = D?.stocks?.[sym]; if (!s) return;
+  currentSymbol = sym;
+  $('dca-ticker').value = sym;
+  $('dca-current').value = s.price;
+  $('dca-ma200').value = s.sma200 ?? '';
+  $('dca-ma240').value = s.sma240 ?? '';
+  $('dca-ma365').value = s.sma365 ?? '';
+  $('dca-extreme-auto').checked = true;
+  document.querySelectorAll('[data-sym]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.sym === sym)));
+  store.set('cf_dca_sym', sym);
+  calculateDca();
+  if (toast) showToast(`${sym} 실데이터(${s.asOf})를 불러왔습니다.`, 'info');
+}
+
+function calculateDca() {
+  const num = id => parseFloat($(id).value);
+  const budget = Math.max(0, num('dca-budget') || 0);
+  const current = num('dca-current');
+  if (!(current > 0)) return;
+
+  if ($('dca-extreme-auto').checked) {
+    const p = Math.min(90, Math.max(5, num('dca-extreme-pct') || 40));
+    $('dca-extreme').value = (current * (1 - p / 100)).toFixed(2);
+  }
+  const lv = { ma200: num('dca-ma200'), ma240: num('dca-ma240'), ma365: num('dca-ma365'), extreme: num('dca-extreme') };
+  const volOk = $('dca-vol-spike').checked;
+
+  // 입력 검증: 기준선 순서
+  const warns = [];
+  const missing = Object.entries(lv).filter(([, v]) => !(v > 0)).map(([k]) => k);
+  if (missing.length) warns.push(`비어 있는 기준선: ${missing.join(', ')} — 상장 기간이 짧으면 해당 이평선이 계산되지 않습니다.`);
+  const order = [['ma200', '200일선'], ['ma240', '240일선'], ['ma365', '365일선'], ['extreme', '극단 저점']];
+  for (let i = 0; i < order.length - 1; i++) {
+    const [a, an] = order[i], [b, bn] = order[i + 1];
+    if (lv[a] > 0 && lv[b] > 0 && lv[a] <= lv[b]) warns.push(`${an}(${usd(lv[a])})이 ${bn}(${usd(lv[b])})보다 낮거나 같습니다. 상승 추세가 아니라 이평선이 역배열인 상태라 분할 순서가 뒤집힙니다.`);
+  }
+  for (let i = 1; i < TRANCHES.length; i++) {
+    const [, la, ka, ma] = TRANCHES[i - 1], [, lb, kb, mb] = TRANCHES[i];
+    if (ka !== kb && lv[ka] > 0 && lv[kb] > 0 && lv[ka] * ma < lv[kb] * mb) {
+      warns.push(`${la} 트리거(${usd(lv[ka] * ma)})가 다음 구간 ${lb}(${usd(lv[kb] * mb)})보다 낮습니다. 이평선 간격이 좁아 회차 순서가 섞입니다.`);
+    }
+  }
+
+  // 이격도 사다리
+  $('dca-ladder-bars').innerHTML = order.map(([k, name], i) => {
+    const price = lv[k], reached = price > 0 && current <= price;
+    const w = [20, 25, 30, 25][i];
+    return `<div class="bg-[#111827] border ${reached ? 'border-emerald-500/50' : 'border-gray-800'} rounded-lg p-3">
+      <div class="flex items-center justify-between text-[11px] mb-1">
+        <span class="font-bold ${STAGE_COLOR[k]}">${name} (${w}%)</span>
+        <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${reached ? 'bg-emerald-500/20 text-emerald-300' : 'bg-gray-800 text-gray-400'}">${reached ? '도달' : price > 0 ? pct((price / current - 1) * 100) : '–'}</span>
+      </div>
+      <div class="mono text-sm font-extrabold text-white">${usd(price)}</div>
+    </div>`;
+  }).join('');
+
+  // 회차 계산
+  let cumAmt = 0, cumSh = 0, pendingAmt = 0, nowW = 0, nowCount = 0;
+  const rows = TRANCHES.map(([no, label, key, mult, w]) => {
+    const trigger = lv[key] > 0 ? +(lv[key] * mult).toFixed(2) : null;
+    const amount = budget * w;
+    const held = key === 'ma365' && !volOk;
+    if (!trigger || held) {
+      pendingAmt += amount;
+      return `<tr class="opacity-50"><td class="py-2.5 px-3 text-gray-300">${no}</td><td class="py-2.5 px-3 font-sans ${STAGE_COLOR[key]}">${label}</td>
+        <td class="py-2.5 px-3">${usd(trigger)}</td><td class="py-2.5 px-3 text-gray-500" colspan="2">${held ? '거래량 확인 전 보류' : '기준선 없음'}</td>
+        <td class="py-2.5 px-3">${fmt(w * 100, 1)}%</td><td class="py-2.5 px-3">${usd(amount, 0)}</td><td class="py-2.5 px-3">–</td><td class="py-2.5 px-3">–</td></tr>`;
+    }
+    const fill = Math.min(trigger, current);
+    if (current <= trigger) { nowW += w; nowCount++; }
+    const shares = amount / fill;
+    cumAmt += amount; cumSh += shares;
+    return `<tr class="hover:bg-gray-800/40">
+      <td class="py-2.5 px-3 font-bold text-gray-300">${no}</td>
+      <td class="py-2.5 px-3 font-sans font-semibold ${STAGE_COLOR[key]}">${label}</td>
+      <td class="py-2.5 px-3 text-white">${usd(trigger)}</td>
+      <td class="py-2.5 px-3 ${fill < trigger ? 'text-emerald-300' : 'text-gray-300'}">${usd(fill)}${current <= trigger ? ' <span class="text-[10px]">(도달)</span>' : ''}</td>
+      <td class="py-2.5 px-3 text-gray-400">${pct((fill / current - 1) * 100)}</td>
+      <td class="py-2.5 px-3 text-gray-300">${fmt(w * 100, 1)}%</td>
+      <td class="py-2.5 px-3 text-emerald-400 font-semibold">${usd(amount, 0)}</td>
+      <td class="py-2.5 px-3 text-gray-300">${fmt(shares, 3)}주</td>
+      <td class="py-2.5 px-3 font-bold text-sky-300">${usd(cumAmt / cumSh)}</td>
+    </tr>`;
+  });
+  $('dca-table-body').innerHTML = rows.join('');
+
+  if (nowCount) {
+    warns.unshift(`현재가(${usd(current)})가 이미 ${nowCount}개 회차의 트리거 아래입니다. 표대로면 배정액의 ${fmt(nowW * 100, 0)}%(${usd(budget * nowW, 0)})를 지금 가격에 사게 됩니다. ` +
+      `이평선 사다리가 이미 의미를 잃은 상태이므로, 원칙 1에 따라 이 금액도 주 1회씩 나눠 집행하거나 기준선을 다시 정하세요.`);
+  }
+  $('dca-warnings').innerHTML = warns.map(w => `<div>⚠ ${esc(w)}</div>`).join('');
+  $('dca-warnings').classList.toggle('hidden', !warns.length);
+
+  const avg = cumSh ? cumAmt / cumSh : null;
+  $('dca-summary').innerHTML = `
+    <div class="bg-[#111827] rounded-lg p-3"><div class="text-gray-400">집행 대상 평단가</div><div class="mono text-base font-extrabold text-emerald-400">${usd(avg)} <span class="text-xs">${avg ? pct((avg / current - 1) * 100) : ''}</span></div></div>
+    <div class="bg-[#111827] rounded-lg p-3"><div class="text-gray-400">집행 대상 금액 / 보류 금액</div><div class="mono text-base font-extrabold text-white">${usd(cumAmt, 0)} <span class="text-gray-500 text-xs">/ ${usd(pendingAmt, 0)}</span></div></div>
+    <div class="bg-[#111827] rounded-lg p-3"><div class="text-gray-400">예상 보유 수량</div><div class="mono text-base font-extrabold text-white">${fmt(cumSh, 3)}주</div></div>`;
+
+  const s = D?.stocks?.[currentSymbol];
+  const edited = s && (num('dca-current') !== s.price || num('dca-ma200') !== s.sma200 || num('dca-ma240') !== s.sma240 || num('dca-ma365') !== s.sma365);
+  $('dca-data-src').innerHTML = s
+    ? `${esc(s.name)} · Yahoo 일봉 종가 ${s.bars}개로 계산 · 기준 ${esc(s.asOf)} · 52주 고점 ${usd(s.high52w)} (${pct(s.drawdown_from_high_pct)})${edited ? ' · <span class="stale">값을 직접 수정함</span>' : ''}`
+    : '직접 입력값';
+}
+['dca-budget', 'dca-current', 'dca-ma200', 'dca-ma240', 'dca-ma365', 'dca-extreme-pct', 'dca-vol-spike', 'dca-extreme-auto'].forEach(id => $(id).addEventListener('input', calculateDca));
+$('dca-extreme').addEventListener('input', () => { $('dca-extreme-auto').checked = false; calculateDca(); });
+$('dca-ticker').addEventListener('change', () => {
+  const sym = $('dca-ticker').value.trim().toUpperCase();
+  if (D?.stocks?.[sym]) loadDcaSymbol(sym, true);
+  else { currentSymbol = null; document.querySelectorAll('[data-sym]').forEach(b => b.setAttribute('aria-pressed', 'false')); calculateDca(); showToast(`${sym}는 감시 목록에 없어 값을 직접 입력해야 합니다.`, 'warn'); }
+});
+
+$('btn-copy-alert').addEventListener('click', () => {
+  const t = $('dca-ticker').value || '종목';
+  const v = id => $(id).value;
+  const lines = [
+    `[증권앱 10분할 저점 알림 — ${t}]`,
+    `• 배정 총액 $${v('dca-budget')} / 현재가 $${v('dca-current')}`,
+    ...TRANCHES.map(([no, label, key, mult]) => {
+      const base = parseFloat(v(`dca-${key}`));
+      return `• ${no}회차 ${label}: ${base > 0 ? '$' + (base * mult).toFixed(2) : '기준선 없음'}`;
+    }),
+    `※ 6~8회차는 거래량 급증 확인 후에만 집행. 주 1회, 기준선 미도달 시 추격 매수 금지.`,
+  ];
+  copyText(lines.join('\n'), `${t} 알림 요약을 복사했습니다.`);
+});
+
+// =====================================================================
+// 7. TAB 4 — 8단 시뮬레이션 (필드 정의 하나로 폼·저장·복사 모두 처리)
+// =====================================================================
+const SIM_FIELDS = [
+  { key: 'event', label: '입력값 (사건 · 뉴스 헤드라인)', tone: 'text-gray-300', required: true },
+  { key: 'crowd', label: '대중의 즉각 반응 & 감정 분리', tone: 'text-rose-400' },
+  { key: 's1', label: '1. 영역 분류 (금융/통화/기술/공급망/심리/지정학)' },
+  { key: 's2', label: '2. 원인 분리 (표면 현상 vs 진짜 근원)' },
+  { key: 's3', label: '3. 증폭 요소 (미디어/레버리지/대중 심리)' },
+  { key: 's4', label: '4. 전이 경로 (다음 충격이 번질 곳)' },
+  { key: 's5', label: '5. 조건 변화 (계약/담보/규제/금리)' },
+  { key: 's6', label: '6. 유동성 방향 (어디서 나와 어디로)' },
+  { key: 's7', label: '7. 되돌림 가능성 (가역 vs 비가역)' },
+  { key: 'avoid', label: '8-A. 절대 하지 말아야 할 행동', tone: 'text-rose-400' },
+  { key: 'doAction', label: '8-B. 최종 행동 판정', tone: 'text-emerald-400', wide: true, textarea: true },
+];
+
+// 예시 문구의 숫자는 실데이터에서 채움 (하드코딩 금지)
+function simPresets() {
+  const m = D?.macro || {}, man = D?.manual || {};
+  const n = v => (v == null ? '?' : fmt(v));
+  return {
+    ai_crash: {
+      event: 'AI 거품 붕괴 헤드라인 확산 & 나스닥 급락',
+      crowd: '공포·분노 — 기술주·AI 섹터 패닉셀',
+      s1: '기술 · 인프라 · 유동성 심리',
+      s2: '표면: AI 밸류에이션 과열 논란 / 근원: 고금리 장기화와 데이터센터 전력·인프라 병목',
+      s3: `자극적 폭락 헤드라인 + 마진데트 $${n(man.margin?.value)}T(M2 대비 ${n(man.margin?.to_m2_pct)}%) 반대매매 공포`,
+      s4: 'AI 소프트웨어 → 반도체·데이터센터 → 한계 기술주(CCC 이하 신용) 순 전이',
+      s5: '빅테크 CAPEX·장기 전력구매계약(PPA) 유지 여부 확인',
+      s6: `위험자산 → MMF($${n(man.mmf?.value)}T)·필수소비재(XLP) 임시 대피`,
+      s7: 'AI·데이터·전력 전환은 비가역, 단기 가격 조정은 가역',
+      avoid: '공포 투매 금지, 바닥 확인 전 추격 매수 금지, 레버리지·한계기업 접근 금지',
+      doAction: `근원 레이어(인데전 대장주)에 집중. VIX ${RULES.vixPeak}+ 정점 후 꺾임과 200·240·365일선 알림 도달 전까지 백팀 방어 유지.`,
+    },
+    rates: {
+      event: `미 10년물 ${n(m.us10y?.value)}% 수준에서 장기금리 급등 우려`,
+      crowd: '불안·혼란 — 성장주·리츠 무차별 매도',
+      s1: '통화정책 · 금리 · 자본흐름',
+      s2: `표면: 연준 매파 발언 / 근원: 준비금 $${n(m.reserves_trillion?.value)}T·역레포 고갈 상태의 유동성 압박`,
+      s3: '연준 발언 부각과 채권 변동성 확대',
+      s4: '고부채 상업용 부동산 리츠·BDC(사모신용) → 레버리지 자산 전반',
+      s5: `EFFR ${n(m.effr?.value)}%, 기업 차입비용 상승, 단기 국채 금리 고공행진`,
+      s6: '레버리지 자산 → T-bill·MMF·현금성 백팀 자산',
+      s7: `준비금이 하한($${RULES.reservesFloorT}T)에 근접하면 정책 전환 가능성 상승`,
+      avoid: '금리 민감 리츠·BDC 매수 금지, 섣부른 피벗 베팅 금지',
+      doAction: '백팀 방어 금고 유지, 4단계(정책 전환) 확인 전까지 실탄 보존.',
+    },
+  };
+}
+
+function buildSimForm() {
+  $('sim-form').innerHTML = SIM_FIELDS.map(f => `
+    <div class="inset p-3.5 ${f.wide ? 'sm:col-span-2' : ''}">
+      <label for="sim-${f.key}" class="block text-xs font-bold ${f.tone || 'text-sky-400'} mb-1">${f.label}</label>
+      ${f.textarea ? `<textarea id="sim-${f.key}" rows="2" class="field text-xs"></textarea>` : `<input id="sim-${f.key}" type="text" class="field text-xs" />`}
+    </div>`).join('');
+  const draft = store.get('cf_sim_draft', null);
+  if (draft) setSimForm(draft);
+  SIM_FIELDS.forEach(f => $(`sim-${f.key}`).addEventListener('input', () => store.set('cf_sim_draft', getSimForm())));
+}
+const getSimForm = () => Object.fromEntries(SIM_FIELDS.map(f => [f.key, $(`sim-${f.key}`).value.trim()]));
+const setSimForm = (obj) => { SIM_FIELDS.forEach(f => { $(`sim-${f.key}`).value = obj?.[f.key] ?? ''; }); store.set('cf_sim_draft', getSimForm()); };
+
+document.querySelectorAll('[data-sim-preset]').forEach(b => b.addEventListener('click', () => {
+  setSimForm(simPresets()[b.dataset.simPreset]);
+  showToast('예시 시나리오를 채웠습니다 (숫자는 현재 실데이터).', 'info');
+}));
+$('btn-sim-clear').addEventListener('click', () => setSimForm({}));
+
+const LOG_KEY = 'capital_flow_lasagna_logs_v2';
+function getLogs() {
+  const v2 = store.get(LOG_KEY, null);
+  if (v2) return v2;
+  // v1(인덱스 기반) 기록이 있으면 id를 붙여 이전
+  const v1 = store.get('capital_flow_lasagna_logs_v1', []);
+  const migrated = v1.map((l, i) => ({ id: `m${Date.now()}_${i}`, ...l }));
+  if (migrated.length) store.set(LOG_KEY, migrated);
+  return migrated;
+}
+function renderLogs() {
+  const logs = getLogs();
+  $('sim-log-count').textContent = `${logs.length}건`;
+  $('sim-logs-list').innerHTML = logs.length ? logs.map(l => `
+    <div class="inset p-3.5 space-y-2">
+      <div class="flex items-start justify-between gap-2">
+        <span class="text-[11px] mono text-gray-500">${esc(l.date)}</span>
+        <div class="flex gap-1.5">
+          <button data-log-load="${esc(l.id)}" class="text-[11px] px-2 py-0.5 rounded bg-sky-500/15 text-sky-300">불러오기</button>
+          <button data-log-del="${esc(l.id)}" class="text-[11px] px-2 py-0.5 rounded bg-rose-500/15 text-rose-300">삭제</button>
+        </div>
+      </div>
+      <div class="text-xs font-bold text-white line-clamp-1">${esc(l.event)}</div>
+      <div class="text-[11px] text-emerald-400 line-clamp-2">결론: ${esc(l.doAction)}</div>
+    </div>`).join('')
+    : '<div class="inset border-dashed p-6 text-center text-xs text-gray-500">저장된 기록이 없습니다.</div>';
+}
+$('sim-logs-list').addEventListener('click', e => {
+  const load = e.target.closest('[data-log-load]'), del = e.target.closest('[data-log-del]');
+  if (load) { const l = getLogs().find(x => x.id === load.dataset.logLoad); if (l) { setSimForm(l); showToast('기록을 불러왔습니다.', 'info'); } }
+  if (del) {
+    const logs = getLogs().filter(x => x.id !== del.dataset.logDel);
+    if (!store.set(LOG_KEY, logs)) return showToast('삭제에 실패했습니다 (브라우저 저장소 차단).', 'warn');
+    renderLogs(); showToast('기록을 삭제했습니다.', 'info');
+  }
+});
+$('btn-sim-save').addEventListener('click', () => {
+  const entry = getSimForm();
+  if (!entry.event) return showToast('사건 · 뉴스 헤드라인을 먼저 입력해 주세요.', 'warn');
+  entry.doAction ||= '관망 및 원칙 유지';
+  entry.id = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  entry.date = new Date().toLocaleString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  entry.snapshot = { vix: D?.vix?.value, hy: D?.macro?.hy_oas?.value, us10y: D?.macro?.us10y?.value, asOf: D?.vix?.asOf };
+  const logs = [entry, ...getLogs()];
+  if (!store.set(LOG_KEY, logs)) return showToast('저장 실패: 브라우저 저장소가 차단됐거나 가득 찼습니다.', 'warn');
+  renderLogs(); showToast('기록함에 저장했습니다 (당시 VIX·HY·10년물 함께 보관).', 'success');
+});
+$('btn-sim-copy').addEventListener('click', () => {
+  const f = getSimForm();
+  const text = ['[라자냐 8단 시뮬레이션 리포트]', ...SIM_FIELDS.map(x => `${x.label}: ${f[x.key]}`),
+    D ? `(데이터 기준 ${D.vix?.asOf}: VIX ${fmt(D.vix?.value)}, HY ${fmt(D.macro?.hy_oas?.value)}%, 10Y ${fmt(D.macro?.us10y?.value)}%)` : ''].join('\n');
+  copyText(text, '리포트를 복사했습니다.');
+});
+
+// =====================================================================
+// 8. 초기화
+// =====================================================================
+renderDataStatus();
+buildStageCards(); updateRadar(); renderLiquidity();
+updatePortfolio(); renderTeams();
+renderDcaPresets();
+const savedSym = store.get('cf_dca_sym', null);
+const firstSym = (savedSym && D?.stocks?.[savedSym]) ? savedSym : Object.keys(D?.stocks || {})[0];
+if (firstSym) loadDcaSymbol(firstSym, false); else calculateDca();
+buildSimForm(); renderLogs();
+switchTab(store.get('cf_tab', 'radar'));
+</script>
+</body>
+</html>

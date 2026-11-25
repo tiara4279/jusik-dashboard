@@ -1,0 +1,45 @@
+name: 시장 데이터 자동 갱신
+
+on:
+  schedule:
+    # 미국장 마감 후: 화~토 한국시간 07:00 (= 월~금 UTC 22:00)
+    - cron: "0 22 * * 1-5"
+  workflow_dispatch: {}          # GitHub Actions 탭에서 수동 실행 버튼
+  push:
+    paths:
+      - manual_inputs.json       # 수동 입력값을 고치면 바로 재계산
+      - update_data.py
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 데이터 수집
+        env:
+          PYTHONIOENCODING: utf-8
+        run: python update_data.py
+
+      - name: 변경분 커밋
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add market_data.js market_data.json
+          if git diff --cached --quiet; then
+            echo "변경 없음"
+          else
+            git commit -m "데이터 갱신 $(date -u +'%Y-%m-%d %H:%M') UTC"
+            git push
+          fi

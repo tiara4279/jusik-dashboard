@@ -1,78 +1,74 @@
 // 자동 생성 파일 — 직접 고치지 말고 update_data.py를 실행하세요.
 window.MARKET_DATA = {
-  "generatedAt": "2026-11-25T08:27",
+  "generatedAt": "2026-11-25T08:31",
   "macro": {
     "us10y": {
-      "value": 4.9,
-      "asOf": "2026-11-24",
-      "source": "Yahoo ^TNX (시장 호가, 재무부 고시와 소폭 차이)",
-      "value_3m_ago": 4.66,
+      "value": 4.92,
+      "asOf": "2026-11-23",
+      "source": "FRED API DGS10",
+      "value_3m_ago": 4.64,
       "prev": 4.92
     },
     "effr": {
       "value": 3.88,
       "asOf": "2026-11-23",
-      "source": "NY 연준 EFFR API",
+      "source": "FRED API EFFR",
       "value_3m_ago": 3.63,
       "prev": 3.88
     },
     "hy_oas": {
       "value": 3.63,
       "asOf": "2026-11-23",
-      "source": "FRED BAMLH0A0HYM2",
+      "source": "FRED API BAMLH0A0HYM2",
       "value_3m_ago": 2.7,
-      "prev": 3.76,
-      "stale": true
+      "prev": 3.76
     },
     "ccc_oas": {
       "value": 13.87,
       "asOf": "2026-11-23",
-      "source": "FRED BAMLH0A3HYC",
+      "source": "FRED API BAMLH0A3HYC",
       "value_3m_ago": 10.39,
-      "prev": 14.02,
-      "stale": true
+      "prev": 14.02
     },
     "reserves_trillion": {
       "value": 2.98,
       "asOf": "2026-11-18",
-      "source": "FRED WRESBAL",
+      "source": "FRED API WRESBAL",
       "value_3m_ago": 2.935,
-      "prev": 2.961,
-      "stale": true
+      "prev": 2.961
     },
     "rrp_billion": {
       "value": 0.301,
       "asOf": "2026-11-24",
-      "source": "NY 연준 역레포 운영 결과 API",
+      "source": "FRED API RRPONTSYD",
       "value_3m_ago": 0.702,
       "prev": 0.35
     },
     "m2_billion": {
       "value": 23532.8,
       "asOf": "2026-10-01",
-      "source": "FRED M2SL",
+      "source": "FRED API M2SL",
       "value_3m_ago": 23177.3,
-      "prev": 23414.3,
-      "stale": true
+      "prev": 23414.3
     },
     "nasdaq": {
       "value": 23733.54,
       "asOf": "2026-11-24",
-      "source": "Yahoo ^IXIC",
+      "source": "FRED API NASDAQCOM",
       "value_3m_ago": 26130.2,
       "prev": 24089.56
     },
     "sp500": {
-      "value": 7201.09,
-      "asOf": "2026-11-24",
-      "source": "Yahoo ^GSPC",
-      "value_3m_ago": 7675.7,
-      "prev": 7237.17
+      "value": 7237.17,
+      "asOf": "2026-11-23",
+      "source": "FRED API SP500",
+      "value_3m_ago": 7677.28,
+      "prev": 6910.39
     }
   },
   "vix": {
-    "value": 26.36,
-    "asOf": "2026-11-24",
+    "value": 28.25,
+    "asOf": "2026-11-25",
     "peak_60d_close": 35.89,
     "peak_60d_date": "2026-11-20",
     "high52w_intraday": 40.03,
@@ -296,10 +292,5 @@ window.MARKET_DATA = {
       "source": "SEC Form 4 집계 (openinsider 등) — 직접 확인 후 갱신"
     }
   },
-  "errors": [
-    "FRED BAMLH0A3HYC: The read operation timed out",
-    "FRED WRESBAL: The read operation timed out",
-    "FRED BAMLH0A0HYM2: The read operation timed out",
-    "FRED M2SL: The read operation timed out"
-  ]
+  "errors": []
 };

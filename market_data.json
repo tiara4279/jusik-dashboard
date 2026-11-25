@@ -1,68 +1,77 @@
 {
-  "generatedAt": "2026-11-25T17:06",
+  "generatedAt": "2026-11-25T08:25",
   "macro": {
     "us10y": {
       "value": 4.92,
       "asOf": "2026-11-23",
       "source": "FRED DGS10",
       "value_3m_ago": 4.64,
-      "prev": 4.92
+      "prev": 4.92,
+      "stale": true
     },
     "effr": {
       "value": 3.88,
       "asOf": "2026-11-23",
       "source": "FRED EFFR",
       "value_3m_ago": 3.63,
-      "prev": 3.88
+      "prev": 3.88,
+      "stale": true
     },
     "hy_oas": {
       "value": 3.63,
       "asOf": "2026-11-23",
       "source": "FRED BAMLH0A0HYM2",
       "value_3m_ago": 2.7,
-      "prev": 3.76
+      "prev": 3.76,
+      "stale": true
     },
     "ccc_oas": {
       "value": 13.87,
       "asOf": "2026-11-23",
       "source": "FRED BAMLH0A3HYC",
       "value_3m_ago": 10.39,
-      "prev": 14.02
+      "prev": 14.02,
+      "stale": true
     },
     "reserves_trillion": {
       "value": 2.98,
       "asOf": "2026-11-18",
       "source": "FRED WRESBAL",
       "value_3m_ago": 2.935,
-      "prev": 2.961
+      "prev": 2.961,
+      "stale": true
     },
     "rrp_billion": {
       "value": 0.301,
       "asOf": "2026-11-24",
       "source": "FRED RRPONTSYD",
       "value_3m_ago": 0.702,
-      "prev": 0.35
+      "prev": 0.35,
+      "stale": true
     },
     "m2_billion": {
       "value": 23532.8,
       "asOf": "2026-10-01",
       "source": "FRED M2SL",
       "value_3m_ago": 23177.3,
-      "prev": 23414.3
+      "prev": 23414.3,
+      "stale": true
     },
     "nasdaq": {
       "value": 23733.54,
       "asOf": "2026-11-24",
       "source": "FRED NASDAQCOM",
       "value_3m_ago": 26130.2,
-      "prev": 24089.56
+      "prev": 24089.56,
+      "stale": true
     },
     "sp500": {
       "value": 7237.17,
       "asOf": "2026-11-23",
       "source": "FRED SP500",
       "value_3m_ago": 7677.28,
-      "prev": 6910.39
+      "prev": 6910.39,
+      "stale": true
     }
   },
   "vix": {
@@ -291,5 +300,15 @@
       "source": "SEC Form 4 집계 (openinsider 등) — 직접 확인 후 갱신"
     }
   },
-  "errors": []
+  "errors": [
+    "FRED RRPONTSYD: The read operation timed out",
+    "FRED BAMLH0A0HYM2: The read operation timed out",
+    "FRED WRESBAL: The read operation timed out",
+    "FRED DGS10: The read operation timed out",
+    "FRED BAMLH0A3HYC: The read operation timed out",
+    "FRED EFFR: The read operation timed out",
+    "FRED NASDAQCOM: The read operation timed out",
+    "FRED M2SL: The read operation timed out",
+    "FRED SP500: The read operation timed out"
+  ]
 }

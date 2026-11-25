@@ -30,6 +30,7 @@ jobs:
       - name: 데이터 수집
         env:
           PYTHONIOENCODING: utf-8
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}   # 없으면 비어 있고, 대체 출처로 수집
         run: python update_data.py
 
       - name: 변경분 커밋

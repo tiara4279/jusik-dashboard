@@ -6,7 +6,8 @@
        market_data.json (같은 내용, 다음 실행 때 실패한 항목의 대체값으로 사용)
 
 자동 수집
-  - FRED (API 키 불필요, CSV): 10년물, EFFR, HY/CCC 스프레드, 은행 준비금, 역레포, M2, 나스닥
+  - FRED: 10년물, EFFR, HY/CCC 스프레드, 은행 준비금, 역레포, M2, 나스닥, S&P500
+    (FRED_API_KEY 환경변수가 있으면 공식 API 사용. 없으면 CSV → 막히면 NY 연준·Yahoo로 대체)
   - Yahoo Finance 차트: VIX, 감시 종목 현재가 + 200/240/365 거래일 단순이동평균
 수동 입력 (manual_inputs.json)
   - MMF 총자산(ICI), 마진데트(FINRA), 내부자 매수/매도(Form 4)
@@ -14,6 +15,7 @@
 import csv
 import io
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -46,10 +48,26 @@ def utc_date(ts):
 
 
 # ---------------------------------------------------------------- FRED
-def fred_series(series_id, days=400):
-    start = (date.today() - timedelta(days=days)).isoformat()
-    url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}&cosd={start}"
-    text = http_get(url, UA_FRED)
+# 수집 순서: ① FRED 공식 API (환경변수 FRED_API_KEY가 있을 때)
+#           ② FRED 그래프 CSV (키 불필요, 단 GitHub Actions 같은 클라우드 IP는 차단됨)
+#           ③ 대체 출처 (NY 연준 API, Yahoo 지수) — FRED에만 있는 지표는 대체 불가
+FRED_KEY = os.environ.get("FRED_API_KEY", "").strip()
+
+
+def _start(days):
+    return (date.today() - timedelta(days=days)).isoformat()
+
+
+def fred_api_rows(series_id, days=400):
+    url = ("https://api.stlouisfed.org/fred/series/observations"
+           f"?series_id={series_id}&api_key={FRED_KEY}&file_type=json&observation_start={_start(days)}")
+    obs = json.loads(http_get(url, UA_FRED, timeout=20, retries=1))["observations"]
+    return [(o["date"], float(o["value"])) for o in obs if o["value"] not in (".", "")]
+
+
+def fred_csv_rows(series_id, days=400):
+    url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}&cosd={_start(days)}"
+    text = http_get(url, UA_FRED, timeout=12, retries=0)
     rows = []
     for row in csv.reader(io.StringIO(text)):
         if len(row) != 2 or row[0] in ("DATE", "observation_date"):
@@ -58,16 +76,64 @@ def fred_series(series_id, days=400):
             rows.append((row[0], float(row[1])))
         except ValueError:
             continue  # 휴장일 등 '.' 값
-    if not rows:
-        raise ValueError(f"{series_id}: 데이터 없음")
     return rows
+
+
+def nyfed_effr_rows(days=400):
+    url = f"https://markets.newyorkfed.org/api/rates/unsecured/effr/search.json?startDate={_start(days)}&endDate={date.today().isoformat()}"
+    rates = json.loads(http_get(url, UA_FRED))["refRates"]
+    return sorted((r["effectiveDate"], float(r["percentRate"])) for r in rates)
+
+
+def nyfed_rrp_rows(days=400):
+    url = f"https://markets.newyorkfed.org/api/rp/reverserepo/propositions/search.json?startDate={_start(days)}&endDate={date.today().isoformat()}"
+    ops = json.loads(http_get(url, UA_FRED))["repo"]["operations"]
+    daily = {}
+    for o in ops:  # 하루 여러 번 운영되면 합산, 달러 → 십억달러
+        daily[o["operationDate"]] = daily.get(o["operationDate"], 0) + o.get("totalAmtAccepted", 0) / 1e9
+    return sorted(daily.items())
+
+
+def yahoo_rows(symbol):
+    pairs, _ = yahoo_closes(symbol, rng="2y")
+    return [(utc_date(t), c) for t, c in pairs]
+
+
+# FRED가 막혔을 때 쓸 대체 출처 (같은 단위로 반환)
+ALT_SOURCES = {
+    "DGS10": ("Yahoo ^TNX (시장 호가, 재무부 고시와 소폭 차이)", lambda: yahoo_rows("^TNX")),
+    "EFFR": ("NY 연준 EFFR API", nyfed_effr_rows),
+    "RRPONTSYD": ("NY 연준 역레포 운영 결과 API", nyfed_rrp_rows),
+    "NASDAQCOM": ("Yahoo ^IXIC", lambda: yahoo_rows("^IXIC")),
+    "SP500": ("Yahoo ^GSPC", lambda: yahoo_rows("^GSPC")),
+}
+
+
+def fred_series(series_id):
+    """(rows, source) 반환. 출처를 차례로 시도하고 모두 실패하면 마지막 오류를 올린다."""
+    attempts = []
+    if FRED_KEY:
+        attempts.append((f"FRED API {series_id}", lambda: fred_api_rows(series_id)))
+    attempts.append((f"FRED {series_id}", lambda: fred_csv_rows(series_id)))
+    if series_id in ALT_SOURCES:
+        attempts.append(ALT_SOURCES[series_id])
+    last = None
+    for source, fn in attempts:
+        try:
+            rows = fn()
+            if rows:
+                return rows, source
+            last = ValueError("데이터 없음")
+        except Exception as e:
+            last = e
+    raise last
 
 
 def fred_latest(series_id, scale=1.0, digits=2):
     try:
-        rows = fred_series(series_id)
+        rows, source = fred_series(series_id)
         d, v = rows[-1]
-        out = {"value": round(v * scale, digits), "asOf": d, "source": f"FRED {series_id}"}
+        out = {"value": round(v * scale, digits), "asOf": d, "source": source}
         # 약 3개월 전 값 (방향 판단용)
         cutoff = (datetime.fromisoformat(d) - timedelta(days=90)).date().isoformat()
         past = [r for r in rows if r[0] <= cutoff]

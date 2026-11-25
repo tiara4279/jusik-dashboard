@@ -1,6 +1,6 @@
 // 자동 생성 파일 — 직접 고치지 말고 update_data.py를 실행하세요.
 window.MARKET_DATA = {
-  "generatedAt": "2026-11-25T08:37",
+  "generatedAt": "2026-11-25T08:47",
   "macro": {
     "us10y": {
       "value": 4.92,
@@ -64,10 +64,18 @@ window.MARKET_DATA = {
       "source": "FRED API SP500",
       "value_3m_ago": 7677.28,
       "prev": 6910.39
+    },
+    "usdkrw": {
+      "value": 1343.6,
+      "asOf": "2026-11-25",
+      "prev": 1341.02,
+      "value_3m_ago": 1380.45,
+      "sma200": 1437.52,
+      "source": "Yahoo KRW=X"
     }
   },
   "vix": {
-    "value": 28.3,
+    "value": 27.76,
     "asOf": "2026-11-25",
     "peak_60d_close": 35.89,
     "peak_60d_date": "2026-11-20",
@@ -77,7 +85,10 @@ window.MARKET_DATA = {
   "stocks": {
     "QQQ": {
       "symbol": "QQQ",
+      "label": "QQQ",
       "name": "Invesco QQQ Trust",
+      "currency": "USD",
+      "market": "US",
       "price": 638.1,
       "asOf": "2026-11-24",
       "sma200": 683.39,
@@ -90,7 +101,10 @@ window.MARKET_DATA = {
     },
     "SPY": {
       "symbol": "SPY",
+      "label": "SPY",
       "name": "State Street SPDR S&P 500 ETF Trust",
+      "currency": "USD",
+      "market": "US",
       "price": 718.78,
       "asOf": "2026-11-24",
       "sma200": 733.04,
@@ -103,7 +117,10 @@ window.MARKET_DATA = {
     },
     "NVDA": {
       "symbol": "NVDA",
+      "label": "NVDA",
       "name": "NVIDIA Corporation",
+      "currency": "USD",
+      "market": "US",
       "price": 155.38,
       "asOf": "2026-11-24",
       "sma200": 203.07,
@@ -116,7 +133,10 @@ window.MARKET_DATA = {
     },
     "TSM": {
       "symbol": "TSM",
+      "label": "TSM",
       "name": "Taiwan Semiconductor Manufacturing Company Limited",
+      "currency": "USD",
+      "market": "US",
       "price": 349.2,
       "asOf": "2026-11-24",
       "sma200": 403.61,
@@ -129,7 +149,10 @@ window.MARKET_DATA = {
     },
     "MSFT": {
       "symbol": "MSFT",
+      "label": "MSFT",
       "name": "Microsoft Corporation",
+      "currency": "USD",
+      "market": "US",
       "price": 496.13,
       "asOf": "2026-11-24",
       "sma200": 444.5,
@@ -142,7 +165,10 @@ window.MARKET_DATA = {
     },
     "GOOGL": {
       "symbol": "GOOGL",
+      "label": "GOOGL",
       "name": "Alphabet Inc.",
+      "currency": "USD",
+      "market": "US",
       "price": 279.05,
       "asOf": "2026-11-24",
       "sma200": 336.54,
@@ -155,7 +181,10 @@ window.MARKET_DATA = {
     },
     "IONQ": {
       "symbol": "IONQ",
+      "label": "IONQ",
       "name": "IonQ, Inc.",
+      "currency": "USD",
+      "market": "US",
       "price": 22.4,
       "asOf": "2026-11-24",
       "sma200": 40.79,
@@ -168,7 +197,10 @@ window.MARKET_DATA = {
     },
     "AVGO": {
       "symbol": "AVGO",
+      "label": "AVGO",
       "name": "Broadcom Inc.",
+      "currency": "USD",
+      "market": "US",
       "price": 301.08,
       "asOf": "2026-11-24",
       "sma200": 367.51,
@@ -181,7 +213,10 @@ window.MARKET_DATA = {
     },
     "PLTR": {
       "symbol": "PLTR",
+      "label": "PLTR",
       "name": "Palantir Technologies Inc.",
+      "currency": "USD",
+      "market": "US",
       "price": 161.18,
       "asOf": "2026-11-24",
       "sma200": 154.18,
@@ -194,7 +229,10 @@ window.MARKET_DATA = {
     },
     "CRWD": {
       "symbol": "CRWD",
+      "label": "CRWD",
       "name": "CrowdStrike Holdings, Inc.",
+      "currency": "USD",
+      "market": "US",
       "price": 210.86,
       "asOf": "2026-11-24",
       "sma200": 177.29,
@@ -207,7 +245,10 @@ window.MARKET_DATA = {
     },
     "GEV": {
       "symbol": "GEV",
+      "label": "GEV",
       "name": "GE Vernova Inc.",
+      "currency": "USD",
+      "market": "US",
       "price": 720.65,
       "asOf": "2026-11-24",
       "sma200": 951.4,
@@ -220,7 +261,10 @@ window.MARKET_DATA = {
     },
     "V": {
       "symbol": "V",
+      "label": "V",
       "name": "Visa Inc.",
+      "currency": "USD",
+      "market": "US",
       "price": 416.78,
       "asOf": "2026-11-24",
       "sma200": 350.01,
@@ -233,7 +277,10 @@ window.MARKET_DATA = {
     },
     "MA": {
       "symbol": "MA",
+      "label": "MA",
       "name": "Mastercard Incorporated",
+      "currency": "USD",
+      "market": "US",
       "price": 647.44,
       "asOf": "2026-11-24",
       "sma200": 545.31,
@@ -246,7 +293,10 @@ window.MARKET_DATA = {
     },
     "KO": {
       "symbol": "KO",
+      "label": "KO",
       "name": "The Coca-Cola Company",
+      "currency": "USD",
+      "market": "US",
       "price": 97.62,
       "asOf": "2026-11-24",
       "sma200": 84.07,
@@ -259,7 +309,10 @@ window.MARKET_DATA = {
     },
     "PG": {
       "symbol": "PG",
+      "label": "PG",
       "name": "The Procter & Gamble Company",
+      "currency": "USD",
+      "market": "US",
       "price": 172.47,
       "asOf": "2026-11-24",
       "sma200": 150.39,
@@ -269,12 +322,63 @@ window.MARKET_DATA = {
       "drawdown_from_high_pct": -0.32,
       "ret_3m_pct": 18.94,
       "bars": 1254
+    },
+    "005930.KS": {
+      "symbol": "005930.KS",
+      "label": "삼성전자",
+      "name": "Samsung Electronics Co., Ltd.",
+      "currency": "KRW",
+      "market": "KR",
+      "price": 170700.0,
+      "asOf": "2026-11-25",
+      "sma200": 241898.25,
+      "sma240": 222828.96,
+      "sma365": 173031.51,
+      "high52w": 362500.0,
+      "drawdown_from_high_pct": -52.91,
+      "ret_3m_pct": -33.58,
+      "bars": 1220
+    },
+    "000660.KS": {
+      "symbol": "000660.KS",
+      "label": "SK하이닉스",
+      "name": "SK hynix Inc.",
+      "currency": "KRW",
+      "market": "KR",
+      "price": 1030000.0,
+      "asOf": "2026-11-25",
+      "sma200": 1532850.0,
+      "sma240": 1387875.0,
+      "sma365": 1033569.86,
+      "high52w": 2919000.0,
+      "drawdown_from_high_pct": -64.71,
+      "ret_3m_pct": -38.36,
+      "bars": 1220
+    },
+    "^KS11": {
+      "symbol": "^KS11",
+      "label": "코스피",
+      "name": "KOSPI Composite Index",
+      "currency": "KRW",
+      "market": "KR",
+      "price": 4697.51,
+      "asOf": "2026-11-25",
+      "sma200": 6519.59,
+      "sma240": 6173.23,
+      "sma365": 5222.09,
+      "high52w": 9114.55,
+      "drawdown_from_high_pct": -48.46,
+      "ret_3m_pct": -29.86,
+      "bars": 1221
     }
   },
   "rotation": {
     "defensive": {
       "symbol": "XLP",
+      "label": "XLP",
       "name": "State Street Consumer Staples Select Sector SPDR ETF",
+      "currency": "USD",
+      "market": "US",
       "price": 91.88,
       "asOf": "2026-11-24",
       "sma200": 85.06,
@@ -287,7 +391,10 @@ window.MARKET_DATA = {
     },
     "luxury": {
       "symbol": "LVMUY",
+      "label": "LVMUY",
       "name": "LVMH Moët Hennessy - Louis Vuitton, Société Européenne",
+      "currency": "USD",
+      "market": "US",
       "price": 87.34,
       "asOf": "2026-11-24",
       "sma200": 105.23,

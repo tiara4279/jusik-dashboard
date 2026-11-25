@@ -1,6 +1,6 @@
 // 자동 생성 파일 — 직접 고치지 말고 update_data.py를 실행하세요.
 window.MARKET_DATA = {
-  "generatedAt": "2026-11-25T08:31",
+  "generatedAt": "2026-11-25T08:37",
   "macro": {
     "us10y": {
       "value": 4.92,
@@ -67,7 +67,7 @@ window.MARKET_DATA = {
     }
   },
   "vix": {
-    "value": 28.25,
+    "value": 28.3,
     "asOf": "2026-11-25",
     "peak_60d_close": 35.89,
     "peak_60d_date": "2026-11-20",
@@ -75,6 +75,32 @@ window.MARKET_DATA = {
     "source": "Yahoo ^VIX (종가 기준)"
   },
   "stocks": {
+    "QQQ": {
+      "symbol": "QQQ",
+      "name": "Invesco QQQ Trust",
+      "price": 638.1,
+      "asOf": "2026-11-24",
+      "sma200": 683.39,
+      "sma240": 672.62,
+      "sma365": 642.8,
+      "high52w": 759.66,
+      "drawdown_from_high_pct": -16.0,
+      "ret_3m_pct": -10.3,
+      "bars": 1254
+    },
+    "SPY": {
+      "symbol": "SPY",
+      "name": "State Street SPDR S&P 500 ETF Trust",
+      "price": 718.78,
+      "asOf": "2026-11-24",
+      "sma200": 733.04,
+      "sma240": 725.5,
+      "sma365": 699.95,
+      "high52w": 779.09,
+      "drawdown_from_high_pct": -7.74,
+      "ret_3m_pct": -6.17,
+      "bars": 1254
+    },
     "NVDA": {
       "symbol": "NVDA",
       "name": "NVIDIA Corporation",
@@ -86,7 +112,7 @@ window.MARKET_DATA = {
       "high52w": 239.24,
       "drawdown_from_high_pct": -35.05,
       "ret_3m_pct": -25.89,
-      "bars": 752
+      "bars": 1254
     },
     "TSM": {
       "symbol": "TSM",
@@ -99,7 +125,7 @@ window.MARKET_DATA = {
       "high52w": 485.8,
       "drawdown_from_high_pct": -28.12,
       "ret_3m_pct": -16.4,
-      "bars": 752
+      "bars": 1254
     },
     "MSFT": {
       "symbol": "MSFT",
@@ -112,7 +138,7 @@ window.MARKET_DATA = {
       "high52w": 555.8,
       "drawdown_from_high_pct": -10.74,
       "ret_3m_pct": -0.05,
-      "bars": 752
+      "bars": 1254
     },
     "GOOGL": {
       "symbol": "GOOGL",
@@ -125,7 +151,7 @@ window.MARKET_DATA = {
       "high52w": 402.62,
       "drawdown_from_high_pct": -30.69,
       "ret_3m_pct": -18.41,
-      "bars": 752
+      "bars": 1254
     },
     "IONQ": {
       "symbol": "IONQ",
@@ -138,7 +164,7 @@ window.MARKET_DATA = {
       "high52w": 72.07,
       "drawdown_from_high_pct": -68.92,
       "ret_3m_pct": -44.04,
-      "bars": 752
+      "bars": 1254
     },
     "AVGO": {
       "symbol": "AVGO",
@@ -151,7 +177,7 @@ window.MARKET_DATA = {
       "high52w": 481.57,
       "drawdown_from_high_pct": -37.48,
       "ret_3m_pct": -15.33,
-      "bars": 752
+      "bars": 1254
     },
     "PLTR": {
       "symbol": "PLTR",
@@ -164,7 +190,7 @@ window.MARKET_DATA = {
       "high52w": 209.05,
       "drawdown_from_high_pct": -22.9,
       "ret_3m_pct": -9.19,
-      "bars": 752
+      "bars": 1254
     },
     "CRWD": {
       "symbol": "CRWD",
@@ -177,7 +203,7 @@ window.MARKET_DATA = {
       "high52w": 278.86,
       "drawdown_from_high_pct": -24.38,
       "ret_3m_pct": 11.46,
-      "bars": 752
+      "bars": 1254
     },
     "GEV": {
       "symbol": "GEV",
@@ -203,7 +229,7 @@ window.MARKET_DATA = {
       "high52w": 436.57,
       "drawdown_from_high_pct": -4.53,
       "ret_3m_pct": 8.56,
-      "bars": 752
+      "bars": 1254
     },
     "MA": {
       "symbol": "MA",
@@ -216,7 +242,7 @@ window.MARKET_DATA = {
       "high52w": 672.68,
       "drawdown_from_high_pct": -3.75,
       "ret_3m_pct": 8.18,
-      "bars": 752
+      "bars": 1254
     },
     "KO": {
       "symbol": "KO",
@@ -229,7 +255,7 @@ window.MARKET_DATA = {
       "high52w": 99.48,
       "drawdown_from_high_pct": -1.87,
       "ret_3m_pct": 8.37,
-      "bars": 752
+      "bars": 1254
     },
     "PG": {
       "symbol": "PG",
@@ -242,7 +268,7 @@ window.MARKET_DATA = {
       "high52w": 173.02,
       "drawdown_from_high_pct": -0.32,
       "ret_3m_pct": 18.94,
-      "bars": 752
+      "bars": 1254
     }
   },
   "rotation": {
@@ -257,7 +283,7 @@ window.MARKET_DATA = {
       "high52w": 92.6,
       "drawdown_from_high_pct": -0.78,
       "ret_3m_pct": 6.5,
-      "bars": 752
+      "bars": 1254
     },
     "luxury": {
       "symbol": "LVMUY",
@@ -270,7 +296,7 @@ window.MARKET_DATA = {
       "high52w": 152.07,
       "drawdown_from_high_pct": -42.57,
       "ret_3m_pct": -17.14,
-      "bars": 752
+      "bars": 1254
     }
   },
   "manual": {

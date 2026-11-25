@@ -331,7 +331,10 @@
 </footer>
 
 <!-- 실데이터 (update_data.py가 생성) -->
-<script src="market_data.js"></script>
+<script>
+  // 데이터 파일은 캐시를 건너뛰고 항상 최신본을 받음 (GitHub Pages는 기본 10분 캐시)
+  document.write('<script src="market_data.js?t=' + Date.now() + '"><\/script>');
+</script>
 <script>
 "use strict";
 
@@ -424,7 +427,10 @@ function renderDataStatus() {
   const stale = daysSince(D.generatedAt.slice(0, 10)) > 3;
   const msgs = [];
   if (stale) msgs.push(`데이터가 ${daysSince(D.generatedAt.slice(0, 10))}일 전 것입니다. <code>python update_data.py</code>로 갱신하세요.`);
-  if (D.errors?.length) msgs.push('수집 실패: ' + D.errors.map(esc).join(' / '));
+  if (D.errors?.length) {
+    msgs.push(`<b>${D.errors.length}개 항목을 이번 갱신에서 받아오지 못해 직전 값을 표시 중입니다.</b> 해당 수치 아래에 "오래된 값"으로 표시됩니다. 다음 자동 갱신 때 다시 시도합니다.`
+      + `<details class="mt-1"><summary class="cursor-pointer text-amber-300/80">자세히</summary>${D.errors.map(esc).join('<br/>')}</details>`);
+  }
   if (msgs.length) { box.innerHTML = msgs.join('<br/>'); box.classList.remove('hidden'); }
 }
 

@@ -126,7 +126,7 @@
         </div>
         <span id="rotation-badge" class="badge self-start sm:self-auto" data-state="near">–</span>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5" id="liquidity-grid"></div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5" id="liquidity-grid"></div>
     </div>
   </section>
 
@@ -184,19 +184,20 @@
     <div class="card p-5 sm:p-6 space-y-5">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div>
-          <span class="text-xs font-bold text-sky-400">일봉 · 거래일 기준 단순이동평균 (미국장 1년 ≈ 252거래일)</span>
+          <span class="text-xs font-bold text-sky-400">일봉 · 거래일 기준 단순이동평균 (1년 ≈ 미국 252 · 한국 약 245거래일)</span>
           <h2 class="text-lg sm:text-xl font-bold text-white mt-0.5">200 · 240 · 365일선 10분할 매수 &amp; 알림 설계기</h2>
         </div>
-        <div class="flex flex-wrap gap-1.5" id="dca-presets"></div>
       </div>
+      <div id="dca-presets" class="space-y-2"></div>
+      <div id="dca-kr-note" class="hidden rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-100 leading-relaxed"></div>
 
       <div class="grid grid-cols-2 lg:grid-cols-7 gap-3 inset p-4">
         <div class="col-span-2 lg:col-span-1">
           <label for="dca-ticker" class="block text-[11px] font-semibold text-gray-400 mb-1">티커</label>
           <input id="dca-ticker" type="text" class="field font-bold" />
         </div>
-        <div><label for="dca-budget" class="block text-[11px] font-semibold text-gray-400 mb-1">배정 총액 ($)</label><input id="dca-budget" type="number" value="10000" min="0" step="100" class="field mono text-emerald-400 font-bold" /></div>
-        <div><label for="dca-current" class="block text-[11px] font-semibold text-gray-400 mb-1">현재가 ($)</label><input id="dca-current" type="number" min="0.01" step="0.01" class="field mono font-bold" /></div>
+        <div><label for="dca-budget" class="block text-[11px] font-semibold text-gray-400 mb-1">배정 총액 (<span class="cur-unit">$</span>)</label><input id="dca-budget" type="number" value="10000" min="0" step="100" class="field mono text-emerald-400 font-bold" /></div>
+        <div><label for="dca-current" class="block text-[11px] font-semibold text-gray-400 mb-1">현재가 (<span class="cur-unit">$</span>)</label><input id="dca-current" type="number" min="0.01" step="0.01" class="field mono font-bold" /></div>
         <div><label for="dca-ma200" class="block text-[11px] font-semibold text-sky-400 mb-1">200일선 (20%)</label><input id="dca-ma200" type="number" min="0.01" step="0.01" class="field mono text-sky-300 font-bold" /></div>
         <div><label for="dca-ma240" class="block text-[11px] font-semibold text-amber-400 mb-1">240일선 (25%)</label><input id="dca-ma240" type="number" min="0.01" step="0.01" class="field mono text-amber-300 font-bold" /></div>
         <div><label for="dca-ma365" class="block text-[11px] font-semibold text-rose-400 mb-1">365일선 (30%)</label><input id="dca-ma365" type="number" min="0.01" step="0.01" class="field mono text-rose-300 font-bold" /></div>
@@ -408,7 +409,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== `tab-${tab}`));
   document.querySelectorAll('[role="tab"]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
   store.set('cf_tab', tab);
-  if (tab === 'dca') renderChart($('dca-ticker').value.trim().toUpperCase());
+  if (tab === 'dca') renderChart(currentSymbol || $('dca-ticker').value.trim().toUpperCase());
 }
 document.querySelectorAll('[role="tab"]').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
 
@@ -649,6 +650,14 @@ function renderLiquidity() {
   const spread = xlp?.ret_3m_pct != null && lux?.ret_3m_pct != null ? lux.ret_3m_pct - xlp.ret_3m_pct : null;
 
   const tiles = [
+    (() => {
+      const fx = m.usdkrw;
+      if (!fx) return { label: '원·달러 환율', val: '–', note: '', src: srcLine(null, 'daily') };
+      const vsAvg = fx.sma200 ? (fx.value / fx.sma200 - 1) * 100 : null;
+      return { label: '원·달러 환율', val: `${fmt(fx.value, 1)}원`,
+        note: vsAvg == null ? '' : `200일 평균 ${fmt(fx.sma200, 1)}원 대비 ${pct(vsAvg)} · ${vsAvg < 0 ? '원화 강세' : '원화 약세'}`,
+        src: srcLine(fx, 'daily'), cls: 'text-sky-300' };
+    })(),
     { label: '은행 준비금 (WRESBAL)', val: res ? `$${fmt(res.value, 2)}T` : '–', note: res ? (res.value >= RULES.reservesFloorT ? `참고 하한 $${RULES.reservesFloorT}T 위` : `참고 하한 $${RULES.reservesFloorT}T 아래`) : '', src: srcLine(res, 'weekly') },
     { label: '역레포 잔액 (RRP)', val: rrp ? `$${fmt(rrp.value, 2)}B` : '–', note: rrp && rrp.value < 50 ? '사실상 고갈 (완충 여력 소진)' : '', src: srcLine(rrp, 'daily') },
     { label: 'MMF 총자산 (수동)', val: mmf ? `$${fmt(mmf.value, 2)}T` : '–', note: '대기 현금', src: srcLine(mmf, 'weekly'), cls: 'text-amber-300' },
@@ -774,18 +783,50 @@ const TRANCHES = [
 const STAGE_COLOR = { ma200: 'text-sky-300', ma240: 'text-amber-300', ma365: 'text-rose-300', extreme: 'text-purple-300' };
 let currentSymbol = null;
 
+// ---- 통화: 미국 종목은 달러(소수점 2자리·소수점 주식), 한국 종목은 원화(정수·정수 주) ----
+let dcaCur = 'USD';
+function money(n, d) {
+  if (n == null || isNaN(n)) return '–';
+  if (dcaCur === 'KRW') return '₩' + Math.round(n).toLocaleString('ko-KR');
+  return usd(n, d ?? 2);
+}
+const budgets = store.get('cf_dca_budgets', { USD: 10000, KRW: 10000000 });
+function setDcaCurrency(cur) {
+  if (cur === dcaCur) return;
+  budgets[dcaCur] = parseFloat($('dca-budget').value) || budgets[dcaCur];
+  dcaCur = cur;
+  const krw = cur === 'KRW';
+  $('dca-budget').value = budgets[cur];
+  $('dca-budget').step = krw ? 100000 : 100;
+  ['dca-current', 'dca-ma200', 'dca-ma240', 'dca-ma365', 'dca-extreme'].forEach(id => { $(id).step = krw ? 1 : 0.01; });
+  document.querySelectorAll('.cur-unit').forEach(el => { el.textContent = krw ? '원' : '$'; });
+  if (chartState.chart) chartState.chart.applyOptions({ localization: { locale: 'ko-KR', priceFormatter: p => money(p) } });
+}
+const symLabel = s => D?.stocks?.[s]?.label || s;
+
 function renderDcaPresets() {
-  const syms = Object.keys(D?.stocks || {});
-  $('dca-presets').innerHTML = syms.length
-    ? syms.map(s => `<button data-sym="${s}" aria-pressed="false" class="chip px-3 py-1.5 rounded-lg text-xs">${s}</button>`).join('')
-    : '<span class="text-xs text-gray-500">실데이터 없음 — 값을 직접 입력하세요</span>';
+  const all = Object.values(D?.stocks || {});
+  if (!all.length) { $('dca-presets').innerHTML = '<span class="text-xs text-gray-500">실데이터 없음 — 값을 직접 입력하세요</span>'; return; }
+  const group = (title, list) => list.length ? `<div class="flex flex-wrap items-center gap-1.5">
+      <span class="text-[11px] font-bold text-gray-400 w-10 shrink-0">${title}</span>
+      ${list.map(s => `<button data-sym="${esc(s.symbol)}" aria-pressed="false" class="chip px-3 py-1.5 rounded-lg text-xs">${esc(s.label || s.symbol)}</button>`).join('')}
+    </div>` : '';
+  $('dca-presets').innerHTML = group('🇺🇸 미국', all.filter(s => s.market !== 'KR')) + group('🇰🇷 한국', all.filter(s => s.market === 'KR'));
   document.querySelectorAll('[data-sym]').forEach(b => b.addEventListener('click', () => loadDcaSymbol(b.dataset.sym, true)));
 }
 
 function loadDcaSymbol(sym, toast) {
   const s = D?.stocks?.[sym]; if (!s) return;
   currentSymbol = sym;
-  $('dca-ticker').value = sym;
+  setDcaCurrency(s.currency === 'KRW' ? 'KRW' : 'USD');
+  const fx = D?.macro?.usdkrw;
+  $('dca-kr-note').classList.toggle('hidden', s.market !== 'KR');
+  if (s.market === 'KR') {
+    $('dca-kr-note').innerHTML = `🇰🇷 <b>${esc(s.label)}</b> 종목은 원화로 계산하고, 수량은 정수 주(소수점 매수 불가)로 내림합니다.
+      바닥 4단계(VIX·미국 하이일드·연준)는 <b>글로벌 위험 신호</b>로만 참고하세요. 외국인 수급·DART 공시는 반영되지 않습니다.
+      ${fx ? `원·달러 ${fmt(fx.value, 1)}원 (200일 평균 ${fmt(fx.sma200, 1)}원, ${fx.value < fx.sma200 ? '원화 강세 구간' : '원화 약세 구간'}).` : ''}`;
+  }
+  $('dca-ticker').value = s.label || sym;
   $('dca-current').value = s.price;
   $('dca-ma200').value = s.sma200 ?? '';
   $('dca-ma240').value = s.sma240 ?? '';
@@ -818,12 +859,12 @@ function calculateDca() {
   const order = [['ma200', '200일선'], ['ma240', '240일선'], ['ma365', '365일선'], ['extreme', '극단 저점']];
   for (let i = 0; i < order.length - 1; i++) {
     const [a, an] = order[i], [b, bn] = order[i + 1];
-    if (lv[a] > 0 && lv[b] > 0 && lv[a] <= lv[b]) warns.push(`${an}(${usd(lv[a])})이 ${bn}(${usd(lv[b])})보다 낮거나 같습니다. 상승 추세가 아니라 이평선이 역배열인 상태라 분할 순서가 뒤집힙니다.`);
+    if (lv[a] > 0 && lv[b] > 0 && lv[a] <= lv[b]) warns.push(`${an}(${money(lv[a])})이 ${bn}(${money(lv[b])})보다 낮거나 같습니다. 상승 추세가 아니라 이평선이 역배열인 상태라 분할 순서가 뒤집힙니다.`);
   }
   for (let i = 1; i < TRANCHES.length; i++) {
     const [, la, ka, ma] = TRANCHES[i - 1], [, lb, kb, mb] = TRANCHES[i];
     if (ka !== kb && lv[ka] > 0 && lv[kb] > 0 && lv[ka] * ma < lv[kb] * mb) {
-      warns.push(`${la} 트리거(${usd(lv[ka] * ma)})가 다음 구간 ${lb}(${usd(lv[kb] * mb)})보다 낮습니다. 이평선 간격이 좁아 회차 순서가 섞입니다.`);
+      warns.push(`${la} 트리거(${money(lv[ka] * ma)})가 다음 구간 ${lb}(${money(lv[kb] * mb)})보다 낮습니다. 이평선 간격이 좁아 회차 순서가 섞입니다.`);
     }
   }
 
@@ -836,7 +877,7 @@ function calculateDca() {
         <span class="font-bold ${STAGE_COLOR[k]}">${name} (${w}%)</span>
         <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${reached ? 'bg-emerald-500/20 text-emerald-300' : 'bg-gray-800 text-gray-400'}">${reached ? '도달' : price > 0 ? pct((price / current - 1) * 100) : '–'}</span>
       </div>
-      <div class="mono text-sm font-extrabold text-white">${usd(price)}</div>
+      <div class="mono text-sm font-extrabold text-white">${money(price)}</div>
     </div>`;
   }).join('');
 
@@ -849,29 +890,37 @@ function calculateDca() {
     if (!trigger || held) {
       pendingAmt += amount;
       return `<tr class="opacity-50"><td class="py-2.5 px-3 text-gray-300">${no}</td><td class="py-2.5 px-3 font-sans ${STAGE_COLOR[key]}">${label}</td>
-        <td class="py-2.5 px-3">${usd(trigger)}</td><td class="py-2.5 px-3 text-gray-500" colspan="2">${held ? '거래량 확인 전 보류' : '기준선 없음'}</td>
-        <td class="py-2.5 px-3">${fmt(w * 100, 1)}%</td><td class="py-2.5 px-3">${usd(amount, 0)}</td><td class="py-2.5 px-3">–</td><td class="py-2.5 px-3">–</td></tr>`;
+        <td class="py-2.5 px-3">${money(trigger)}</td><td class="py-2.5 px-3 text-gray-500" colspan="2">${held ? '거래량 확인 전 보류' : '기준선 없음'}</td>
+        <td class="py-2.5 px-3">${fmt(w * 100, 1)}%</td><td class="py-2.5 px-3">${money(amount, 0)}</td><td class="py-2.5 px-3">–</td><td class="py-2.5 px-3">–</td></tr>`;
     }
     const fill = Math.min(trigger, current);
     if (current <= trigger) { nowW += w; nowCount++; }
-    const shares = amount / fill;
-    cumAmt += amount; cumSh += shares;
+    // 한국 종목은 소수점 매수가 안 되므로 정수 주로 내림하고 실제 집행액을 다시 계산
+    const shares = dcaCur === 'KRW' ? Math.floor(amount / fill) : amount / fill;
+    const spent = dcaCur === 'KRW' ? shares * fill : amount;
+    pendingAmt += amount - spent;
+    cumAmt += spent; cumSh += shares;
     return `<tr class="hover:bg-gray-800/40">
       <td class="py-2.5 px-3 font-bold text-gray-300">${no}</td>
       <td class="py-2.5 px-3 font-sans font-semibold ${STAGE_COLOR[key]}">${label}</td>
-      <td class="py-2.5 px-3 text-white">${usd(trigger)}</td>
-      <td class="py-2.5 px-3 ${fill < trigger ? 'text-emerald-300' : 'text-gray-300'}">${usd(fill)}${current <= trigger ? ' <span class="text-[10px]">(도달)</span>' : ''}</td>
+      <td class="py-2.5 px-3 text-white">${money(trigger)}</td>
+      <td class="py-2.5 px-3 ${fill < trigger ? 'text-emerald-300' : 'text-gray-300'}">${money(fill)}${current <= trigger ? ' <span class="text-[10px]">(도달)</span>' : ''}</td>
       <td class="py-2.5 px-3 text-gray-400">${pct((fill / current - 1) * 100)}</td>
       <td class="py-2.5 px-3 text-gray-300">${fmt(w * 100, 1)}%</td>
-      <td class="py-2.5 px-3 text-emerald-400 font-semibold">${usd(amount, 0)}</td>
-      <td class="py-2.5 px-3 text-gray-300">${fmt(shares, 3)}주</td>
-      <td class="py-2.5 px-3 font-bold text-sky-300">${usd(cumAmt / cumSh)}</td>
+      <td class="py-2.5 px-3 text-emerald-400 font-semibold">${money(amount, 0)}</td>
+      <td class="py-2.5 px-3 text-gray-300">${dcaCur === 'KRW' ? shares.toLocaleString('ko-KR') : fmt(shares, 3)}주</td>
+      <td class="py-2.5 px-3 font-bold text-sky-300">${cumSh ? money(cumAmt / cumSh) : '–'}</td>
     </tr>`;
   });
   $('dca-table-body').innerHTML = rows.join('');
 
+  if (dcaCur === 'KRW' && current > 0) {
+    const minW = Math.min(...TRANCHES.map(r => r[4]));
+    const needed = Math.ceil(current / minW / 100000) * 100000;
+    if (budget * minW < current) warns.unshift(`1주 가격(${money(current)})이 가장 작은 회차 배정액(${money(budget * minW)})보다 커서 0주로 계산되는 회차가 있습니다. 10회 모두 1주 이상 사려면 배정 총액이 최소 ${money(needed)} 필요합니다.`);
+  }
   if (nowCount) {
-    warns.unshift(`현재가(${usd(current)})가 이미 ${nowCount}개 회차의 트리거 아래입니다. 표대로면 배정액의 ${fmt(nowW * 100, 0)}%(${usd(budget * nowW, 0)})를 지금 가격에 사게 됩니다. ` +
+    warns.unshift(`현재가(${money(current)})가 이미 ${nowCount}개 회차의 트리거 아래입니다. 표대로면 배정액의 ${fmt(nowW * 100, 0)}%(${money(budget * nowW, 0)})를 지금 가격에 사게 됩니다. ` +
       `이평선 사다리가 이미 의미를 잃은 상태이므로, 원칙 1에 따라 이 금액도 주 1회씩 나눠 집행하거나 기준선을 다시 정하세요.`);
   }
   $('dca-warnings').innerHTML = warns.map(w => `<div>⚠ ${esc(w)}</div>`).join('');
@@ -879,21 +928,23 @@ function calculateDca() {
 
   const avg = cumSh ? cumAmt / cumSh : null;
   $('dca-summary').innerHTML = `
-    <div class="bg-[#111827] rounded-lg p-3"><div class="text-gray-400">집행 대상 평단가</div><div class="mono text-base font-extrabold text-emerald-400">${usd(avg)} <span class="text-xs">${avg ? pct((avg / current - 1) * 100) : ''}</span></div></div>
-    <div class="bg-[#111827] rounded-lg p-3"><div class="text-gray-400">집행 대상 금액 / 보류 금액</div><div class="mono text-base font-extrabold text-white">${usd(cumAmt, 0)} <span class="text-gray-500 text-xs">/ ${usd(pendingAmt, 0)}</span></div></div>
-    <div class="bg-[#111827] rounded-lg p-3"><div class="text-gray-400">예상 보유 수량</div><div class="mono text-base font-extrabold text-white">${fmt(cumSh, 3)}주</div></div>`;
+    <div class="bg-[#111827] rounded-lg p-3"><div class="text-gray-400">집행 대상 평단가</div><div class="mono text-base font-extrabold text-emerald-400">${money(avg)} <span class="text-xs">${avg ? pct((avg / current - 1) * 100) : ''}</span></div></div>
+    <div class="bg-[#111827] rounded-lg p-3"><div class="text-gray-400">집행 대상 금액 / 보류 금액</div><div class="mono text-base font-extrabold text-white">${money(cumAmt, 0)} <span class="text-gray-500 text-xs">/ ${money(pendingAmt, 0)}</span></div></div>
+    <div class="bg-[#111827] rounded-lg p-3"><div class="text-gray-400">예상 보유 수량</div><div class="mono text-base font-extrabold text-white">${dcaCur === 'KRW' ? cumSh.toLocaleString('ko-KR') : fmt(cumSh, 3)}주</div></div>`;
 
   const s = D?.stocks?.[currentSymbol];
   const edited = s && (num('dca-current') !== s.price || num('dca-ma200') !== s.sma200 || num('dca-ma240') !== s.sma240 || num('dca-ma365') !== s.sma365);
   $('dca-data-src').innerHTML = s
-    ? `${esc(s.name)} · Yahoo 일봉 종가 ${s.bars}개로 계산 · 기준 ${esc(s.asOf)} · 52주 고점 ${usd(s.high52w)} (${pct(s.drawdown_from_high_pct)})${edited ? ' · <span class="stale">값을 직접 수정함</span>' : ''}`
+    ? `${esc(s.name)} · Yahoo 일봉 종가 ${s.bars}개로 계산 · 기준 ${esc(s.asOf)} · 52주 고점 ${money(s.high52w)} (${pct(s.drawdown_from_high_pct)})${edited ? ' · <span class="stale">값을 직접 수정함</span>' : ''}`
     : '직접 입력값';
   if (chartState.sym) updateChartLevels();
 }
+$('dca-budget').addEventListener('input', () => { budgets[dcaCur] = parseFloat($('dca-budget').value) || 0; store.set('cf_dca_budgets', budgets); });
 ['dca-budget', 'dca-current', 'dca-ma200', 'dca-ma240', 'dca-ma365', 'dca-extreme-pct', 'dca-vol-spike', 'dca-extreme-auto'].forEach(id => $(id).addEventListener('input', calculateDca));
 $('dca-extreme').addEventListener('input', () => { $('dca-extreme-auto').checked = false; calculateDca(); });
 $('dca-ticker').addEventListener('change', () => {
-  const sym = $('dca-ticker').value.trim().toUpperCase();
+  const raw = $('dca-ticker').value.trim();
+  const sym = Object.values(D?.stocks || {}).find(s => s.label === raw || s.symbol === raw.toUpperCase())?.symbol || raw.toUpperCase();
   if (D?.stocks?.[sym]) loadDcaSymbol(sym, true);
   else { currentSymbol = null; document.querySelectorAll('[data-sym]').forEach(b => b.setAttribute('aria-pressed', 'false')); calculateDca(); renderChart(sym); showToast(`${sym}는 감시 목록에 없어 값을 직접 입력해야 합니다.`, 'warn'); }
 });
@@ -903,10 +954,10 @@ $('btn-copy-alert').addEventListener('click', () => {
   const v = id => $(id).value;
   const lines = [
     `[증권앱 10분할 저점 알림 — ${t}]`,
-    `• 배정 총액 $${v('dca-budget')} / 현재가 $${v('dca-current')}`,
+    `• 배정 총액 ${money(parseFloat(v('dca-budget')), 0)} / 현재가 ${money(parseFloat(v('dca-current')))}`,
     ...TRANCHES.map(([no, label, key, mult]) => {
       const base = parseFloat(v(`dca-${key}`));
-      return `• ${no}회차 ${label}: ${base > 0 ? '$' + (base * mult).toFixed(2) : '기준선 없음'}`;
+      return `• ${no}회차 ${label}: ${base > 0 ? money(base * mult) : '기준선 없음'}`;
     }),
     `※ 6~8회차는 거래량 급증 확인 후에만 집행. 주 1회, 기준선 미도달 시 추격 매수 금지.`,
   ];
@@ -937,10 +988,11 @@ function ensureChart() {
         autoSize: true,
         layout: { background: { color: 'transparent' }, textColor: '#9ca3af', fontFamily: 'Inter, sans-serif' },
         grid: { vertLines: { color: 'rgba(31,41,55,.6)' }, horzLines: { color: 'rgba(31,41,55,.6)' } },
-        rightPriceScale: { borderColor: '#1f2937', scaleMargins: { top: 0.06, bottom: 0.24 } },
+        // 아래 여백을 크게 두면 그 구간에 음수 가격 눈금이 생겨서, 거래량은 하단 15%에 반투명으로 겹쳐 그림
+        rightPriceScale: { borderColor: '#1f2937', scaleMargins: { top: 0.06, bottom: 0.08 } },
         timeScale: { borderColor: '#1f2937' },
         crosshair: { mode: LC.CrosshairMode.Normal },
-        localization: { locale: 'ko-KR', priceFormatter: p => '$' + p.toFixed(2) },
+        localization: { locale: 'ko-KR', priceFormatter: p => money(p) },
       });
       chartState.chart = chart;
       chartState.series.candle = chart.addCandlestickSeries({
@@ -953,7 +1005,7 @@ function ensureChart() {
       chartState.series.ma240 = line('#f59e0b');
       chartState.series.ma365 = line('#f43f5e');
       chartState.series.vol = chart.addHistogramSeries({ priceScaleId: 'vol', priceFormat: { type: 'volume' }, lastValueVisible: false, priceLineVisible: false });
-      chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+      chart.priceScale('vol').applyOptions({ scaleMargins: { top: 0.85, bottom: 0 } });
     });
   }
   return chartState.ready;
@@ -976,7 +1028,7 @@ async function renderChart(sym) {
     return;
   }
   const h = window.MARKET_HISTORY?.[sym];
-  $('chart-title').textContent = sym ? `${sym}` : '차트';
+  $('chart-title').textContent = sym ? symLabel(sym) : '차트';
   if (!h) {
     Object.values(chartState.series).forEach(s => s.setData([]));
     $('chart-position').textContent = sym ? `${sym}는 감시 목록에 없어 차트가 없습니다 (manual_inputs.json의 watchlist에 추가).` : '';
@@ -1005,7 +1057,7 @@ async function renderChart(sym) {
 
   const recent = spikes.filter(s => t.indexOf(s.time) >= t.length - 20);
   $('chart-volume-note').innerHTML = recent.length
-    ? `최근 20거래일 거래량 급증 <b class="text-emerald-400">${recent.length}회</b> — 마지막 ${esc(recent.at(-1).time)} (평균의 ${recent.at(-1).ratio.toFixed(1)}배, 종가 ${usd(recent.at(-1).close)}). 365일선 부근에서 나온 급증이면 "거래량 급증 확인" 체크 근거가 됩니다.`
+    ? `최근 20거래일 거래량 급증 <b class="text-emerald-400">${recent.length}회</b> — 마지막 ${esc(recent.at(-1).time)} (평균의 ${recent.at(-1).ratio.toFixed(1)}배, 종가 ${money(recent.at(-1).close)}). 365일선 부근에서 나온 급증이면 "거래량 급증 확인" 체크 근거가 됩니다.`
     : '최근 20거래일 동안 50일 평균의 2배를 넘는 거래량 급증은 없었습니다.';
 
   updateChartLevels();
@@ -1026,7 +1078,7 @@ chartState.range = store.get('cf_chart_range', 252);
 // 분할 기준선(입력값)을 가로 점선으로 표시 — 입력을 바꾸면 따라 움직임
 function updateChartLevels() {
   const s = chartState.series.candle;
-  if (!s || !chartState.sym || $('dca-ticker').value.trim().toUpperCase() !== chartState.sym) return;
+  if (!s || !chartState.sym || currentSymbol !== chartState.sym) return;
   chartState.lines.forEach(pl => s.removePriceLine(pl));
   chartState.lines = [];
   const LS = window.LightweightCharts.LineStyle;
@@ -1039,9 +1091,9 @@ function updateChartLevels() {
   const cur = parseFloat($('dca-current').value), st = D?.stocks?.[chartState.sym];
   if (cur > 0 && st) {
     const rel = (k, name) => st[k] ? `${name} ${pct((cur / st[k] - 1) * 100)}` : null;
-    const parts = [`52주 고점 ${usd(st.high52w)} 대비 <b class="${st.drawdown_from_high_pct <= -20 ? 'text-rose-300' : 'text-gray-100'}">${pct((cur / st.high52w - 1) * 100)}</b>`,
+    const parts = [`52주 고점 ${money(st.high52w)} 대비 <b class="${st.drawdown_from_high_pct <= -20 ? 'text-rose-300' : 'text-gray-100'}">${pct((cur / st.high52w - 1) * 100)}</b>`,
       rel('sma200', '200일선'), rel('sma240', '240일선'), rel('sma365', '365일선')].filter(Boolean);
-    $('chart-position').innerHTML = `현재가 ${usd(cur)} · ` + parts.join(' · ');
+    $('chart-position').innerHTML = `현재가 ${money(cur)} · ` + parts.join(' · ');
   }
 }
 

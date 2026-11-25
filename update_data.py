@@ -47,6 +47,11 @@ def utc_date(ts):
     return datetime.fromtimestamp(ts, tz=timezone.utc).date().isoformat()
 
 
+def local_date(ts, gmtoffset=0):
+    """거래소 현지 날짜. 한국장 일봉은 KST 00:00(=전날 UTC 15:00)으로 찍혀서 UTC로 바꾸면 하루 밀림."""
+    return datetime.fromtimestamp(ts + (gmtoffset or 0), tz=timezone.utc).date().isoformat()
+
+
 # ---------------------------------------------------------------- FRED
 # 수집 순서: ① FRED 공식 API (환경변수 FRED_API_KEY가 있을 때)
 #           ② FRED 그래프 CSV (키 불필요, 단 GitHub Actions 같은 클라우드 IP는 차단됨)
@@ -182,15 +187,16 @@ def sma(values, n):
     return round(sum(values[-n:]) / n, 2)
 
 
-def stock_snapshot(symbol):
+def stock_snapshot(symbol, label=None):
     try:
         rows, meta = yahoo_ohlcv(symbol)
+        off = meta.get("gmtoffset", 0)
         closes = [r[4] for r in rows]
         price = meta.get("regularMarketPrice") or closes[-1]
         last_ts = rows[-1][0]
         tail = rows[-HISTORY_BARS:]
         HISTORY[symbol] = {
-            "t": [utc_date(r[0]) for r in tail],
+            "t": [local_date(r[0], off) for r in tail],
             "o": [round(r[1], 2) for r in tail],
             "h": [round(r[2], 2) for r in tail],
             "l": [round(r[3], 2) for r in tail],
@@ -201,9 +207,12 @@ def stock_snapshot(symbol):
         ret_63 = round((closes[-1] / closes[-64] - 1) * 100, 2) if len(closes) > 64 else None
         return {
             "symbol": symbol,
+            "label": label or symbol,
             "name": meta.get("longName") or meta.get("shortName") or symbol,
+            "currency": meta.get("currency") or "USD",
+            "market": "KR" if (meta.get("currency") == "KRW") else "US",
             "price": round(price, 2),
-            "asOf": utc_date(last_ts),
+            "asOf": local_date(last_ts, off),
             "sma200": sma(closes, 200),
             "sma240": sma(closes, 240),
             "sma365": sma(closes, 365),
@@ -211,6 +220,25 @@ def stock_snapshot(symbol):
             "drawdown_from_high_pct": round((price / high_252 - 1) * 100, 2),
             "ret_3m_pct": ret_63,
             "bars": len(closes),
+        }
+    except Exception as e:
+        errors.append(f"Yahoo {symbol}: {e}")
+        return None
+
+
+def fx_snapshot(symbol):
+    """원/달러 환율: 현재값, 200일 평균, 3개월 전 값."""
+    try:
+        pairs, meta = yahoo_closes(symbol, rng="2y")
+        closes = [c for _, c in pairs]
+        off = meta.get("gmtoffset", 0)
+        return {
+            "value": round(meta.get("regularMarketPrice") or closes[-1], 2),
+            "asOf": local_date(pairs[-1][0], off),
+            "prev": round(closes[-2], 2),
+            "value_3m_ago": round(closes[-64], 2) if len(closes) > 64 else None,
+            "sma200": sma(closes, 200),
+            "source": f"Yahoo {symbol}",
         }
     except Exception as e:
         errors.append(f"Yahoo {symbol}: {e}")
@@ -261,14 +289,18 @@ def main():
         "sp500": ("SP500", 1.0, 2),
     }
     rot = manual["rotation_pair"]
-    yahoo_syms = list(dict.fromkeys(manual["watchlist"] + [rot["defensive"], rot["luxury"]]))
+    kr = manual.get("watchlist_kr", {})          # {"005930.KS": "삼성전자", ...}
+    fx_sym = manual.get("fx_symbol", "KRW=X")
+    yahoo_syms = list(dict.fromkeys(manual["watchlist"] + list(kr) + [rot["defensive"], rot["luxury"]]))
     with ThreadPoolExecutor(max_workers=6) as pool:
         fred_f = {k: pool.submit(fred_latest, *args) for k, args in fred_jobs.items()}
         vix_f = pool.submit(vix_snapshot)
-        stock_f = {s: pool.submit(stock_snapshot, s) for s in yahoo_syms}
+        stock_f = {s: pool.submit(stock_snapshot, s, kr.get(s)) for s in yahoo_syms}
+        fx_f = pool.submit(fx_snapshot, fx_sym)
         macro = {k: f.result() for k, f in fred_f.items()}
         snaps = {s: f.result() for s, f in stock_f.items()}
         vix_now = vix_f.result()
+        macro["usdkrw"] = fx_f.result()
     # 실패한 항목은 이전 실행 값으로 대체하고 표시
     for k, v in macro.items():
         if v is None and prev.get("macro", {}).get(k):
@@ -277,7 +309,7 @@ def main():
     vix = vix_now or (dict(prev["vix"], stale=True) if prev.get("vix") else None)
 
     stocks = {}
-    for sym in manual["watchlist"]:
+    for sym in manual["watchlist"] + list(kr):
         snap = snaps.get(sym)
         if snap is None and prev.get("stocks", {}).get(sym):
             snap = dict(prev["stocks"][sym], stale=True)

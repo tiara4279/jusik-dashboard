@@ -17,5 +17,7 @@
     "source": "SEC Form 4 집계 (openinsider 등) — 직접 확인 후 갱신"
   },
   "watchlist": ["QQQ", "SPY", "NVDA", "TSM", "MSFT", "GOOGL", "IONQ", "AVGO", "PLTR", "CRWD", "GEV", "V", "MA", "KO", "PG"],
+  "watchlist_kr": { "005930.KS": "삼성전자", "000660.KS": "SK하이닉스", "^KS11": "코스피" },
+  "fx_symbol": "KRW=X",
   "rotation_pair": { "defensive": "XLP", "luxury": "LVMUY" }
 }

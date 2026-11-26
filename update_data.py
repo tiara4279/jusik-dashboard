@@ -63,14 +63,14 @@ def _start(days):
     return (date.today() - timedelta(days=days)).isoformat()
 
 
-def fred_api_rows(series_id, days=400):
+def fred_api_rows(series_id, days=800):
     url = ("https://api.stlouisfed.org/fred/series/observations"
            f"?series_id={series_id}&api_key={FRED_KEY}&file_type=json&observation_start={_start(days)}")
     obs = json.loads(http_get(url, UA_FRED, timeout=20, retries=1))["observations"]
     return [(o["date"], float(o["value"])) for o in obs if o["value"] not in (".", "")]
 
 
-def fred_csv_rows(series_id, days=400):
+def fred_csv_rows(series_id, days=800):
     url = f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={series_id}&cosd={_start(days)}"
     text = http_get(url, UA_FRED, timeout=12, retries=0)
     rows = []
@@ -135,9 +135,14 @@ def fred_series(series_id):
     raise last
 
 
+RISK_SERIES = {}   # 위험 지표 차트용 일별 시계열 (risk_history.js)
+FRED_ROWS = {}
+
+
 def fred_latest(series_id, scale=1.0, digits=2):
     try:
         rows, source = fred_series(series_id)
+        FRED_ROWS[series_id] = rows
         d, v = rows[-1]
         out = {"value": round(v * scale, digits), "asOf": d, "source": source}
         # 약 3개월 전 값 (방향 판단용)
@@ -195,7 +200,10 @@ def stock_snapshot(symbol, label=None):
         closes = [r[4] for r in rows]
         price = meta.get("regularMarketPrice") or closes[-1]
         last_ts = rows[-1][0]
-        tail = rows[-HISTORY_BARS:]
+        by_day = {}
+        for r in rows:  # 같은 날짜 봉이 두 개면 나중 것을 사용
+            by_day[local_date(r[0], off)] = r
+        tail = [by_day[d] for d in sorted(by_day)][-HISTORY_BARS:]
         HISTORY[symbol] = {
             "t": [local_date(r[0], off) for r in tail],
             "o": [round(r[1], 2) for r in tail],
@@ -305,6 +313,7 @@ def dealer_burden(move_series):
             raise ValueError("겹치는 기간 부족")
         avg = sum(v for _, v in window) / len(window)
         idx = [(d, v / avg * 100) for d, v in window]
+        RISK_SERIES["var_proxy"] = [(d, round(v, 1)) for d, v in idx]
         last_d, last_i = idx[-1]
         rank = sum(1 for _, v in idx if v <= last_i) / len(idx) * 100
         return {
@@ -323,7 +332,8 @@ def dealer_burden(move_series):
 
 def vix_snapshot():
     try:
-        pairs, meta = yahoo_closes("^VIX", rng="1y")
+        pairs, meta = yahoo_closes("^VIX", rng="2y")
+        RISK_SERIES["vix"] = [(local_date(t, meta.get("gmtoffset", 0)), round(c, 2)) for t, c in pairs]
         closes = [c for _, c in pairs]
         recent = closes[-60:]  # 최근 약 3개월
         peak = max(recent)
@@ -342,6 +352,37 @@ def vix_snapshot():
     except Exception as e:
         errors.append(f"Yahoo ^VIX: {e}")
         return None
+
+
+def write_risk_history(days=760):
+    """위험 지표 차트용 시계열을 risk_history.js로 저장 (최근 약 2년)."""
+    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    rs = dict(RISK_SERIES)
+    if "BAMLH0A0HYM2" in FRED_ROWS:
+        rs["hy"] = FRED_ROWS["BAMLH0A0HYM2"]
+    if "DGS10" in FRED_ROWS:
+        rs["us10y"] = FRED_ROWS["DGS10"]
+    if "SOFR" in FRED_ROWS and "IORB" in FRED_ROWS:
+        iorb = dict(FRED_ROWS["IORB"])
+        rs["sofr_iorb"] = [(d, round((v - iorb[d]) * 100, 1)) for d, v in FRED_ROWS["SOFR"] if d in iorb]
+    out = {}
+    for k, rows in rs.items():
+        # 같은 날짜가 두 번 오는 경우(장중 마지막 봉 등)는 나중 값으로 덮고 날짜순 정렬
+        rows = sorted({d: v for d, v in rows if d >= cutoff and v is not None}.items())
+        if rows:
+            out[k] = {"t": [d for d, _ in rows], "v": [v for _, v in rows]}
+    path = BASE / "risk_history.json"
+    old = {}
+    if path.exists():
+        try:
+            old = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            old = {}
+    old.update(out)   # 이번에 실패한 지표는 이전 값 유지
+    compact = json.dumps(old, separators=(",", ":"))
+    path.write_text(compact, encoding="utf-8")
+    (BASE / "risk_history.js").write_text(
+        "// 자동 생성 파일 — 위험 지표 차트용 시계열\nwindow.RISK_HISTORY = " + compact + ";\n", encoding="utf-8")
 
 
 # ---------------------------------------------------------------- main
@@ -387,7 +428,10 @@ def main():
         macro["usdkrw"] = fx_f.result()
         move_snap, move_series = move_f.result()
         macro["move"] = move_snap
-        macro["dxy"] = dxy_f.result()[0]
+        dxy_snap, dxy_series = dxy_f.result()
+        macro["dxy"] = dxy_snap
+    RISK_SERIES["move"] = [(d, round(v, 2)) for d, v in move_series]
+    RISK_SERIES["dxy"] = [(d, round(v, 2)) for d, v in dxy_series]
     macro["dealer_var_proxy"] = dealer_burden(move_series) if move_series else None
     # 실패한 항목은 이전 실행 값으로 대체하고 표시
     for k, v in macro.items():
@@ -433,6 +477,8 @@ def main():
     (BASE / "market_data.js").write_text(js, encoding="utf-8")
 
     # 차트용 일봉 — 실패한 종목은 이전 파일의 값을 유지
+    write_risk_history()
+
     hist_path = BASE / "history.json"
     hist = {}
     if hist_path.exists():

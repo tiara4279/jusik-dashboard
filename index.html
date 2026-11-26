@@ -145,6 +145,19 @@
         <div id="crisis-stages" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5"></div>
       </div>
 
+      <!-- 위험 지표 추이 그래프: 위험선 위 = 빨강, 아래 = 초록 -->
+      <div class="space-y-2.5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div class="text-xs font-bold text-gray-300">위험 지표 추이 <span class="font-normal text-gray-500">— 굵은 선(위험선) 위로 올라가면 빨간색, 아래면 초록색. 점선은 참고 구간</span></div>
+          <div class="flex gap-1.5" id="risk-range">
+            <button data-risk-range="182" aria-pressed="false" class="chip px-2.5 py-1 rounded-lg text-xs">6개월</button>
+            <button data-risk-range="365" aria-pressed="true" class="chip px-2.5 py-1 rounded-lg text-xs">1년</button>
+            <button data-risk-range="730" aria-pressed="false" class="chip px-2.5 py-1 rounded-lg text-xs">2년</button>
+          </div>
+        </div>
+        <div id="risk-charts" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+      </div>
+
       <div id="bond-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5"></div>
 
       <details class="inset p-3.5 text-xs text-gray-300">
@@ -461,6 +474,7 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('hidden', p.id !== `tab-${tab}`));
   document.querySelectorAll('[role="tab"]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
   store.set('cf_tab', tab);
+  if (tab === 'radar' && riskState.charts.length) setRiskRange(riskState.range);  // 숨겨진 상태에서 그린 그래프 범위 재적용
   if (tab === 'dca') renderChart(currentSymbol || $('dca-ticker').value.trim().toUpperCase());
 }
 document.querySelectorAll('[role="tab"]').forEach(b => b.addEventListener('click', () => switchTab(b.dataset.tab)));
@@ -776,6 +790,103 @@ function renderBondRisk() {
       <div>${t.src}</div>
     </div>`).join('');
 }
+
+// ---- 위험 지표 추이 그래프 ----
+let libPromise = null;
+function loadLib() {
+  return libPromise ||= (window.LightweightCharts ? Promise.resolve() : loadScript(CHART_LIB));
+}
+// 지표별 위험선(base): 이 값 위로 올라가면 빨간 채움. levels: 참고 구간 점선
+const RISK_CHARTS = [
+  { key: 'move', title: 'MOVE · 국채 변동성', base: RULES.moveAlert, baseLabel: '경계 100',
+    levels: [[60, '안정 60', '#10b981'], [80, '주의 80', '#f59e0b'], [120, '고위험 120', '#f43f5e'], [150, '심각 150', '#be123c']], digits: 1 },
+  { key: 'vix', title: 'VIX · 주식 변동성', base: RULES.vixSpread, baseLabel: '확산 30',
+    levels: [[20, '평온 20', '#10b981'], [RULES.vixPeak, `바닥 1단계 ${RULES.vixPeak}`, '#a855f7']], digits: 2 },
+  { key: 'var_proxy', title: 'VaR 부담 추정 (3년 평균 = 100, 주간)', base: RULES.varProxyHigh, baseLabel: `경계 ${RULES.varProxyHigh}`,
+    levels: [[100, '3년 평균', '#9ca3af']], digits: 1 },
+  { key: 'sofr_iorb', title: 'SOFR − IORB · 레포 조달 압력 (bp)', base: RULES.sofrIorbBp, baseLabel: `경색 +${RULES.sofrIorbBp}bp`,
+    levels: [[0, '0bp', '#9ca3af']], digits: 0, unit: 'bp' },
+  { key: 'hy', title: 'HY 스프레드 · 기업 신용위험 (%)', base: RULES.hyWarn, baseLabel: `경계 ${RULES.hyWarn}%`,
+    levels: [[RULES.hyCrisis, `바닥 2단계 ${RULES.hyCrisis}%`, '#a855f7']], digits: 2, unit: '%' },
+  { key: 'dxy', title: '달러인덱스 (DXY)', base: 'avg252', baseLabel: '1년 평균',
+    levels: [], digits: 2 },
+];
+const riskState = { charts: [], range: store.get('cf_risk_range', 365) };
+
+async function renderRiskCharts() {
+  const box = $('risk-charts');
+  box.innerHTML = RISK_CHARTS.map(c => `
+    <div class="inset p-3">
+      <div class="flex items-start justify-between gap-2 mb-1">
+        <div class="text-[11px] font-bold text-gray-300">${c.title}</div>
+        <div class="text-right"><div class="mono text-sm font-extrabold" id="rc-val-${c.key}">–</div><div class="text-[10px]" id="rc-st-${c.key}"></div></div>
+      </div>
+      <div id="rc-${c.key}" class="w-full h-[170px] sm:h-[190px]"></div>
+    </div>`).join('');
+  try {
+    await Promise.all([loadLib(), window.RISK_HISTORY ? null : loadScript('risk_history.js?v=' + encodeURIComponent(D?.generatedAt || ''))]);
+  } catch (e) {
+    box.innerHTML = `<div class="text-xs text-amber-300">그래프를 불러오지 못했습니다 (${esc(e.message)}).</div>`;
+    return;
+  }
+  const LC = window.LightweightCharts, H = window.RISK_HISTORY || {};
+  riskState.charts = [];
+  for (const c of RISK_CHARTS) {
+    const h = H[c.key], el = $(`rc-${c.key}`);
+    if (!h?.t?.length) { el.innerHTML = '<div class="h-full flex items-center justify-center text-[11px] text-gray-500">데이터 없음</div>'; continue; }
+    const base = c.base === 'avg252' ? h.v.slice(-252).reduce((a, b) => a + b, 0) / Math.min(252, h.v.length) : c.base;
+    const fmtV = v => (c.unit === 'bp' && v > 0 ? '+' : '') + v.toFixed(c.digits) + (c.unit || '');
+    const chart = LC.createChart(el, {
+      autoSize: true,
+      layout: { background: { color: 'transparent' }, textColor: '#9ca3af', fontSize: 10, fontFamily: 'Inter, sans-serif' },
+      grid: { vertLines: { visible: false }, horzLines: { color: 'rgba(31,41,55,.6)' } },
+      rightPriceScale: { borderColor: '#1f2937', scaleMargins: { top: 0.12, bottom: 0.08 } },
+      timeScale: { borderColor: '#1f2937' },
+      handleScroll: { vertTouchDrag: false }, handleScale: { axisPressedMouseMove: false },
+      localization: { locale: 'ko-KR', priceFormatter: fmtV },
+    });
+    const s = chart.addBaselineSeries({
+      baseValue: { type: 'price', price: base },
+      topLineColor: '#f43f5e', topFillColor1: 'rgba(244,63,94,.35)', topFillColor2: 'rgba(244,63,94,.05)',
+      bottomLineColor: '#10b981', bottomFillColor1: 'rgba(16,185,129,.05)', bottomFillColor2: 'rgba(16,185,129,.25)',
+      lineWidth: 2, priceLineVisible: false,
+      // 위험선이 화면 밖이어도 항상 보이게 해서 "얼마나 남았는지"를 눈으로 확인
+      autoscaleInfoProvider: original => {
+        const r = original();
+        if (r?.priceRange) {
+          r.priceRange.minValue = Math.min(r.priceRange.minValue, base);
+          r.priceRange.maxValue = Math.max(r.priceRange.maxValue, base + Math.abs(base) * 0.03);
+        }
+        return r;
+      },
+    });
+    const pts = [...new Map(h.t.map((time, i) => [time, h.v[i]])).entries()].sort((x, y) => x[0] < y[0] ? -1 : 1);
+    s.setData(pts.map(([time, value]) => ({ time, value })));
+    s.createPriceLine({ price: base, color: '#f43f5e', lineWidth: 2, lineStyle: LC.LineStyle.Solid, axisLabelVisible: true, title: c.baseLabel });
+    c.levels.forEach(([price, title, color]) => s.createPriceLine({ price, color, lineWidth: 1, lineStyle: LC.LineStyle.Dashed, axisLabelVisible: false, title }));
+
+    const last = h.v.at(-1), gap = last - base;
+    $(`rc-val-${c.key}`).textContent = fmtV(last);
+    $(`rc-val-${c.key}`).className = `mono text-sm font-extrabold ${gap >= 0 ? 'text-rose-300' : 'text-emerald-300'}`;
+    $(`rc-st-${c.key}`).innerHTML = gap >= 0
+      ? `<span class="text-rose-300">위험선 위 (+${Math.abs(gap).toFixed(c.digits)}${c.unit || ''})</span>`
+      : `<span class="text-gray-400">위험선까지 ${Math.abs(gap).toFixed(c.digits)}${c.unit || ''} 남음</span>`;
+    riskState.charts.push({ chart, key: c.key });
+  }
+  setRiskRange(riskState.range);
+}
+
+function setRiskRange(days) {
+  riskState.range = days;
+  store.set('cf_risk_range', days);
+  document.querySelectorAll('[data-risk-range]').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.riskRange === days)));
+  const to = new Date(), from = new Date(Date.now() - days * 86400000);
+  const iso = d => d.toISOString().slice(0, 10);
+  requestAnimationFrame(() => riskState.charts.forEach(({ chart }) => {
+    try { chart.timeScale().setVisibleRange({ from: iso(from), to: iso(to) }); } catch { chart.timeScale().fitContent(); }
+  }));
+}
+document.querySelectorAll('[data-risk-range]').forEach(b => b.addEventListener('click', () => setRiskRange(+b.dataset.riskRange)));
 
 function renderLiquidity() {
   const m = D?.macro || {}, man = D?.manual || {};
@@ -1115,7 +1226,7 @@ function loadScript(src) {
 function ensureChart() {
   if (!chartState.ready) {
     chartState.ready = Promise.all([
-      window.LightweightCharts ? null : loadScript(CHART_LIB),
+      loadLib(),
       window.MARKET_HISTORY ? null : loadScript('history.js?v=' + encodeURIComponent(D?.generatedAt || '')),
     ]).then(() => {
       const LC = window.LightweightCharts;
@@ -1127,6 +1238,7 @@ function ensureChart() {
         rightPriceScale: { borderColor: '#1f2937', scaleMargins: { top: 0.06, bottom: 0.08 } },
         timeScale: { borderColor: '#1f2937' },
         crosshair: { mode: LC.CrosshairMode.Normal },
+        handleScroll: { vertTouchDrag: false },   // 폰에서 위아래로 밀면 페이지가 스크롤되도록
         localization: { locale: 'ko-KR', priceFormatter: p => money(p) },
       });
       chartState.chart = chart;
@@ -1360,7 +1472,7 @@ $('btn-sim-copy').addEventListener('click', () => {
 // 8. 초기화
 // =====================================================================
 renderDataStatus();
-buildStageCards(); updateRadar(); renderLiquidity(); renderBondRisk();
+buildStageCards(); updateRadar(); renderLiquidity(); renderBondRisk(); renderRiskCharts();
 updatePortfolio(); renderTeams();
 renderDcaPresets();
 const savedSym = store.get('cf_dca_sym', null);

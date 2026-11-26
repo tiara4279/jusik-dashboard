@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-26T03:15",
+  "generatedAt": "2026-11-26T03:21",
   "macro": {
     "us10y": {
       "value": 4.91,
@@ -93,7 +93,7 @@
       "prev": 3.05
     },
     "usdkrw": {
-      "value": 1343.28,
+      "value": 1343.62,
       "asOf": "2026-11-26",
       "prev": 1342.65,
       "value_3m_ago": 1377.11,
@@ -385,14 +385,14 @@
       "name": "Samsung Electronics Co., Ltd.",
       "currency": "KRW",
       "market": "KR",
-      "price": 171700.0,
+      "price": 172400.0,
       "asOf": "2026-11-26",
-      "sma200": 241954.25,
-      "sma240": 223113.54,
-      "sma365": 173348.77,
+      "sma200": 241957.75,
+      "sma240": 223116.46,
+      "sma365": 173350.68,
       "high52w": 362500.0,
-      "drawdown_from_high_pct": -52.63,
-      "ret_3m_pct": -33.19,
+      "drawdown_from_high_pct": -52.44,
+      "ret_3m_pct": -32.92,
       "bars": 1220
     },
     "000660.KS": {
@@ -401,14 +401,14 @@
       "name": "SK hynix Inc.",
       "currency": "KRW",
       "market": "KR",
-      "price": 1054000.0,
+      "price": 1058000.0,
       "asOf": "2026-11-26",
-      "sma200": 1533575.0,
-      "sma240": 1389941.67,
-      "sma365": 1035887.67,
+      "sma200": 1533595.0,
+      "sma240": 1389958.33,
+      "sma365": 1035898.63,
       "high52w": 2919000.0,
-      "drawdown_from_high_pct": -63.89,
-      "ret_3m_pct": -37.19,
+      "drawdown_from_high_pct": -63.75,
+      "ret_3m_pct": -36.95,
       "bars": 1220
     },
     "^KS11": {
@@ -417,14 +417,14 @@
       "name": "KOSPI Composite Index",
       "currency": "KRW",
       "market": "KR",
-      "price": 4715.81,
+      "price": 4724.37,
       "asOf": "2026-11-26",
-      "sma200": 6517.04,
-      "sma240": 6176.24,
-      "sma365": 5227.55,
+      "sma200": 6517.09,
+      "sma240": 6176.27,
+      "sma365": 5227.58,
       "high52w": 9114.55,
-      "drawdown_from_high_pct": -48.26,
-      "ret_3m_pct": -30.06,
+      "drawdown_from_high_pct": -48.17,
+      "ret_3m_pct": -29.93,
       "bars": 1221
     }
   },

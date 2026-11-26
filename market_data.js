@@ -1,6 +1,6 @@
 // 자동 생성 파일 — 직접 고치지 말고 update_data.py를 실행하세요.
 window.MARKET_DATA = {
-  "generatedAt": "2026-11-26T03:58",
+  "generatedAt": "2026-11-26T04:27",
   "macro": {
     "us10y": {
       "value": 4.91,
@@ -94,11 +94,11 @@ window.MARKET_DATA = {
       "prev": 3.05
     },
     "usdkrw": {
-      "value": 1343.26,
+      "value": 1342.67,
       "asOf": "2026-11-26",
       "prev": 1342.65,
       "value_3m_ago": 1377.11,
-      "sma200": 1437.04,
+      "sma200": 1437.03,
       "source": "Yahoo KRW=X"
     },
     "move": {
@@ -107,15 +107,17 @@ window.MARKET_DATA = {
       "chg_5d_pct": -0.62,
       "chg_20d_pct": -0.34,
       "high_1y": 115.02,
+      "max_60d": 113.6,
       "low_1y": 55.77,
       "source": "Yahoo ^MOVE (ICE BofA MOVE)"
     },
     "dxy": {
-      "value": 103.83,
+      "value": 103.8,
       "asOf": "2026-11-25",
-      "chg_5d_pct": -0.07,
-      "chg_20d_pct": 1.75,
+      "chg_5d_pct": -0.09,
+      "chg_20d_pct": 1.73,
       "high_1y": 104.32,
+      "max_60d": 104.32,
       "low_1y": 96.22,
       "source": "Yahoo DX-Y.NYB (달러인덱스)"
     },
@@ -386,14 +388,14 @@ window.MARKET_DATA = {
       "name": "Samsung Electronics Co., Ltd.",
       "currency": "KRW",
       "market": "KR",
-      "price": 173200.0,
+      "price": 173600.0,
       "asOf": "2026-11-26",
-      "sma200": 241961.75,
-      "sma240": 223119.79,
-      "sma365": 173352.88,
+      "sma200": 241963.75,
+      "sma240": 223121.46,
+      "sma365": 173353.97,
       "high52w": 362500.0,
-      "drawdown_from_high_pct": -52.22,
-      "ret_3m_pct": -32.61,
+      "drawdown_from_high_pct": -52.11,
+      "ret_3m_pct": -32.45,
       "bars": 1220
     },
     "000660.KS": {
@@ -402,14 +404,14 @@ window.MARKET_DATA = {
       "name": "SK hynix Inc.",
       "currency": "KRW",
       "market": "KR",
-      "price": 1065000.0,
+      "price": 1067000.0,
       "asOf": "2026-11-26",
-      "sma200": 1533630.0,
-      "sma240": 1389987.5,
-      "sma365": 1035917.81,
+      "sma200": 1533640.0,
+      "sma240": 1389995.83,
+      "sma365": 1035923.29,
       "high52w": 2919000.0,
-      "drawdown_from_high_pct": -63.51,
-      "ret_3m_pct": -36.53,
+      "drawdown_from_high_pct": -63.45,
+      "ret_3m_pct": -36.41,
       "bars": 1220
     },
     "^KS11": {
@@ -418,14 +420,14 @@ window.MARKET_DATA = {
       "name": "KOSPI Composite Index",
       "currency": "KRW",
       "market": "KR",
-      "price": 4751.98,
+      "price": 4765.11,
       "asOf": "2026-11-26",
-      "sma200": 6517.22,
-      "sma240": 6176.39,
-      "sma365": 5227.65,
+      "sma200": 6517.29,
+      "sma240": 6176.44,
+      "sma365": 5227.69,
       "high52w": 9114.55,
-      "drawdown_from_high_pct": -47.86,
-      "ret_3m_pct": -29.52,
+      "drawdown_from_high_pct": -47.72,
+      "ret_3m_pct": -29.33,
       "bars": 1221
     }
   },

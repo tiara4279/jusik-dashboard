@@ -277,6 +277,7 @@ def index_snapshot(symbol, label):
             "chg_5d_pct": pct_change(closes, 5),
             "chg_20d_pct": pct_change(closes, 20),
             "high_1y": round(max(last252), 2),
+            "max_60d": round(max(closes[-60:]), 2),   # 최근 약 3개월 최고 (정점 후 꺾임 판단용)
             "low_1y": round(min(last252), 2),
             "source": f"Yahoo {symbol} ({label})",
         }

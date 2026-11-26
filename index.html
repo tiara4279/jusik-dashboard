@@ -128,6 +128,46 @@
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3.5" id="liquidity-grid"></div>
     </div>
+
+    <!-- 국채·자금시장 위험: MOVE · VaR 추정 · 자금조달 -->
+    <div class="card p-5 sm:p-6 space-y-5">
+      <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+        <div>
+          <h3 class="text-base sm:text-lg font-bold text-white">국채 · 자금시장 위험 모니터 (MOVE · VaR 추정 · 달러 조달)</h3>
+          <p class="text-xs text-gray-400 mt-0.5">VIX가 주식시장의 공포라면 MOVE는 국채시장의 공포, VaR는 그 공포가 금융기관의 강제 매도로 바뀔 가능성입니다.</p>
+        </div>
+        <span id="bond-combo-badge" class="badge self-start" data-state="near">–</span>
+      </div>
+
+      <!-- 금융위험 진행 4단계 -->
+      <div>
+        <div class="text-xs font-bold text-gray-300 mb-2">금융위험 진행 단계 <span class="font-normal text-gray-500">— 실제 위기는 순서대로 오지 않을 수 있어 여러 지표를 교차 확인하는 용도입니다</span></div>
+        <div id="crisis-stages" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5"></div>
+      </div>
+
+      <div id="bond-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5"></div>
+
+      <details class="inset p-3.5 text-xs text-gray-300">
+        <summary class="cursor-pointer font-bold text-gray-200">MOVE 구간 · VIX 조합 해석 · VaR 추정 방식 보기</summary>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-3 leading-relaxed">
+          <div>
+            <div class="font-bold text-sky-300 mb-1">MOVE 구간 (경험적 참고 범위)</div>
+            60 미만 안정 · 60~80 일반 · 80~100 주의 · 100~120 경계 · 120~150 고위험 · 150 이상 심각.<br/>
+            절대 수치보다 <b>상승 속도</b>가 중요합니다. 65→95 같은 단기 급등이 110→115보다 위험합니다.
+          </div>
+          <div>
+            <div class="font-bold text-sky-300 mb-1">VIX × MOVE 조합 (20일 변화 기준)</div>
+            둘 다 하락: 안정화 · MOVE↑ VIX↓: 주식시장이 아직 반영 안 한 채권 불안 (가장 경계) ·
+            MOVE↓ VIX↑: 주식 중심 불안 · 둘 다 상승: 전반적 위험 확대 · 둘 다 급등: 시스템 위기 점검.
+          </div>
+          <div>
+            <div class="font-bold text-amber-300 mb-1">VaR 추정 지수는 실제 VaR가 아닙니다</div>
+            금융기관별 VaR는 실시간으로 공개되지 않습니다. 여기서는 NY 연준이 매주 공개하는 <b>프라이머리 딜러 국채 순보유액 × MOVE</b>를 최근 3년 평균 = 100으로 환산했습니다.
+            재고가 쌓인 상태에서 변동성이 오르면 딜러가 VaR 한도에 가까워져 포지션을 줄인다는 연준 연구를 근사한 값입니다. CDS는 무료 공개 데이터가 없어 넣지 않았습니다.
+          </div>
+        </div>
+      </details>
+    </div>
   </section>
 
   <!-- ================= TAB 2: 청팀/백팀 ================= -->
@@ -351,7 +391,19 @@ const RULES = {
   insiderRatioNear: 0.25, // 3단계 근접: 매수/매도 비율
   fedCutBp: 25,           // 4단계 자동 힌트: 3개월간 EFFR 인하폭(bp)
   reservesFloorT: 2.5,    // 은행 준비금 하한 참고선 ($T)
-  staleDays: { daily: 5, weekly: 14, monthly: 70 },
+  staleDays: { daily: 5, weekly: 14, weeklyLag: 24, monthly: 70 },  // weeklyLag: 1~2주 늦게 발표되는 주간 지표
+  // 국채·자금시장 위험 (경험적 참고 기준 — 공식 위기 판정 기준 아님)
+  moveZones: [[60, '안정', 'met'], [80, '일반', 'info'], [100, '주의', 'near'], [120, '경계', 'near'], [150, '고위험', 'none'], [Infinity, '심각', 'none']],
+  moveAlert: 100,          // 1단계: MOVE 수준
+  moveSurge20d: 25,        // 1단계: MOVE 20일 급등(%)
+  trendPct: 5,             // VIX·MOVE 20일 변화가 ±이 값을 넘으면 상승/하락으로 봄
+  sofrIorbBp: 5,           // 2단계: SOFR − IORB (bp)
+  hy3mWidenPp: 1.0,        // 2단계: HY 스프레드 3개월 확대폭(%p)
+  vixSpread: 30,           // 3단계: VIX 수준
+  dxySurge20d: 2,          // 3단계: 달러인덱스 20일 상승(%)
+  swapStressM: 5000,       // 3단계: 통화스와프 잔액 $5B
+  swapCrisisM: 50000,      // 4단계: 통화스와프 잔액 $50B (2020년 3월엔 $4,000억대)
+  varProxyHigh: 120,       // VaR 추정 지수 경계선 (3년 평균 = 100)
 };
 const D = window.MARKET_DATA || null;
 
@@ -641,6 +693,89 @@ $('btn-reset-live').addEventListener('click', () => {
   buildStageCards(); updateRadar();
   showToast('실데이터 값으로 되돌렸습니다.', 'info');
 });
+
+// ---- 국채·자금시장 위험 패널 ----
+const crisisChecks = store.get('cf_crisis_checks', { cbIntervention: false });
+function renderBondRisk() {
+  const m = D?.macro || {}, vix = D?.vix;
+  const move = m.move, dxy = m.dxy, sofr = m.sofr, iorb = m.iorb, swp = m.swap_lines_million, vp = m.dealer_var_proxy;
+  const hy = m.hy_oas, us10 = m.us10y, jp10 = m.jp10y;
+  const spreadBp = sofr && iorb ? Math.round((sofr.value - iorb.value) * 100) : null;
+  const hyWiden = hy?.value_3m_ago != null ? hy.value - hy.value_3m_ago : null;
+  const zone = move ? RULES.moveZones.find(([lim]) => move.value < lim) : null;
+
+  // VIX × MOVE 조합
+  const dir = v => v == null ? null : v >= RULES.trendPct ? 'up' : v <= -RULES.trendPct ? 'down' : 'flat';
+  const md = dir(move?.chg_20d_pct), vd = dir(vix?.chg_20d_pct);
+  let combo = { state: 'locked', text: 'VIX·MOVE 데이터 부족' };
+  if (md && vd) {
+    const surge = (move.chg_20d_pct >= 25) && (vix.chg_20d_pct >= 50);
+    if (surge) combo = { state: 'none', text: '둘 다 급등 — 시스템 위기 가능성 점검' };
+    else if (md === 'up' && vd === 'up') combo = { state: 'none', text: 'MOVE↑ VIX↑ — 금융시장 전반 위험 확대' };
+    else if (md === 'up') combo = { state: 'none', text: 'MOVE↑ VIX 안정 — 주식시장이 아직 반영 안 한 채권 불안' };
+    else if (vd === 'up') combo = { state: 'near', text: 'VIX↑ MOVE 안정 — 주식시장 중심의 불안' };
+    else if (md === 'down' && vd === 'down') combo = { state: 'met', text: 'MOVE↓ VIX↓ — 금융시장 안정화' };
+    else combo = { state: 'info', text: 'VIX·MOVE 뚜렷한 방향 없음' };
+  }
+  const cb = $('bond-combo-badge'); cb.dataset.state = combo.state; cb.textContent = combo.text;
+
+  // 금융위험 진행 4단계 (각 단계 독립 평가)
+  const S = [
+    { name: '1. 위험 감지', desc: '국채시장 불안', checks: [
+      [`MOVE ≥ ${RULES.moveAlert}`, move && move.value >= RULES.moveAlert, move ? fmt(move.value, 1) : '–'],
+      [`MOVE 20일 +${RULES.moveSurge20d}% 이상`, move?.chg_20d_pct != null && move.chg_20d_pct >= RULES.moveSurge20d, move ? pct(move.chg_20d_pct) : '–'] ] },
+    { name: '2. 자금시장 경색', desc: '레포·신용 스프레드', checks: [
+      [`SOFR − IORB ≥ +${RULES.sofrIorbBp}bp`, spreadBp != null && spreadBp >= RULES.sofrIorbBp, spreadBp != null ? `${spreadBp > 0 ? '+' : ''}${spreadBp}bp` : '–'],
+      [`HY 3개월 +${RULES.hy3mWidenPp}%p 이상 확대`, hyWiden != null && hyWiden >= RULES.hy3mWidenPp, hyWiden != null ? `${hyWiden >= 0 ? '+' : ''}${fmt(hyWiden, 2)}%p` : '–'] ] },
+    { name: '3. 금융위험 확산', desc: 'VIX 급등 + 달러 조달 압력', all: true, checks: [
+      [`VIX ≥ ${RULES.vixSpread}`, vix && vix.value >= RULES.vixSpread, vix ? fmt(vix.value) : '–'],
+      [`달러인덱스 20일 +${RULES.dxySurge20d}% 또는 스와프 $${RULES.swapStressM / 1000}B+`, (dxy?.chg_20d_pct >= RULES.dxySurge20d) || (swp?.value >= RULES.swapStressM), `${dxy ? pct(dxy.chg_20d_pct) : '–'} / $${swp ? fmt(swp.value / 1000, 2) : '–'}B`] ] },
+    { name: '4. 위기 현실화', desc: '긴급 유동성 · 중앙은행 개입', checks: [
+      [`통화스와프 $${RULES.swapCrisisM / 1000}B+`, swp?.value >= RULES.swapCrisisM, swp ? `$${fmt(swp.value / 1000, 2)}B` : '–'],
+      ['중앙은행 긴급 개입 확인 (직접 판단)', crisisChecks.cbIntervention, ''] ] },
+  ];
+  $('crisis-stages').innerHTML = S.map((st, i) => {
+    const hits = st.checks.filter(c => c[1]).length;
+    const met = st.all ? hits === st.checks.length : hits > 0;
+    const state = met ? 'none' : hits ? 'near' : 'met';
+    return `<div class="inset p-3 space-y-1.5">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-xs font-bold text-white">${st.name}</span>
+        <span class="badge" data-state="${state}">${met ? '신호 발생' : hits ? '일부 신호' : '신호 없음'}</span>
+      </div>
+      <div class="text-[11px] text-gray-500">${st.desc}${st.all ? ' (두 조건 모두)' : ' (하나라도)'}</div>
+      ${st.checks.map(([label, on, val]) => i === 3 && !val
+        ? `<label class="flex items-center gap-2 text-[11px] text-gray-300 cursor-pointer"><input type="checkbox" data-crisis="cbIntervention" ${on ? 'checked' : ''} class="rounded"/> ${label}</label>`
+        : `<div class="flex items-center justify-between text-[11px]"><span class="${on ? 'text-rose-300 font-bold' : 'text-gray-400'}">${on ? '●' : '○'} ${label}</span><span class="mono text-gray-200">${val}</span></div>`).join('')}
+    </div>`;
+  }).join('');
+  document.querySelectorAll('[data-crisis]').forEach(el => el.addEventListener('change', () => {
+    crisisChecks[el.dataset.crisis] = el.checked; store.set('cf_crisis_checks', crisisChecks); renderBondRisk();
+  }));
+
+  // 지표 타일
+  const chg = o => o ? `5일 ${pct(o.chg_5d_pct)} · 20일 ${pct(o.chg_20d_pct)}` : '';
+  const tiles = [
+    { label: 'MOVE (국채 변동성)', val: move ? fmt(move.value, 1) : '–', cls: zone ? { met: 'text-emerald-300', info: 'text-sky-300', near: 'text-amber-300', none: 'text-rose-300' }[zone[2]] : 'text-white',
+      note: move ? `<span class="badge" data-state="${zone[2]}">${zone[1]}</span> ${chg(move)}<br/>1년 범위 ${fmt(move.low_1y, 1)} ~ ${fmt(move.high_1y, 1)}` : '', src: srcLine(move, 'daily') },
+    { label: 'VIX (주식 변동성)', val: vix ? fmt(vix.value) : '–', note: chg(vix), src: srcLine(vix, 'daily') },
+    { label: 'VaR 부담 추정 지수 (실제 VaR 아님)', val: vp ? fmt(vp.value, 1) : '–', cls: vp && vp.value >= RULES.varProxyHigh ? 'text-rose-300' : 'text-white',
+      note: vp ? `3년 평균 = 100 · 3년 중 상위 ${100 - vp.percentile_3y}%${vp.prev_4w != null ? ` · 4주 전 ${fmt(vp.prev_4w, 1)}` : ''}<br/>딜러 국채 순보유 $${fmt(vp.dealer_position_billion, 1)}B` : '', src: srcLine(vp, 'weeklyLag') },
+    { label: 'SOFR − IORB (레포 조달 압력)', val: spreadBp != null ? `${spreadBp > 0 ? '+' : ''}${spreadBp}bp` : '–', cls: spreadBp >= RULES.sofrIorbBp ? 'text-rose-300' : spreadBp > 0 ? 'text-amber-300' : 'text-white',
+      note: sofr && iorb ? `SOFR ${fmt(sofr.value)}% · IORB ${fmt(iorb.value)}% — 양(+)이면 담보부 단기자금이 정책 금리보다 비쌈` : '', src: srcLine(sofr, 'daily') },
+    { label: '연준 통화스와프 잔액', val: swp ? `$${fmt(swp.value / 1000, 2)}B` : '–', note: '해외 중앙은행의 달러 조달 수요 (평시 수억 달러)', src: srcLine(swp, 'weekly') },
+    { label: '달러인덱스 (DXY)', val: dxy ? fmt(dxy.value, 2) : '–', note: dxy ? `${chg(dxy)} · 1년 ${fmt(dxy.low_1y, 1)}~${fmt(dxy.high_1y, 1)}` : '', src: srcLine(dxy, 'daily') },
+    { label: '미·일 10년물 금리차', val: us10 && jp10 ? `${fmt(us10.value - jp10.value, 2)}%p` : '–', note: us10 && jp10 ? `미 ${fmt(us10.value)}% − 일 ${fmt(jp10.value)}% (일본은 월간 값) · 좁아지면 엔캐리 청산 압력` : '', src: srcLine(jp10, 'monthly') },
+    { label: 'HY 스프레드 3개월 변화', val: hyWiden != null ? `${hyWiden >= 0 ? '+' : ''}${fmt(hyWiden, 2)}%p` : '–', note: hy ? `${fmt(hy.value_3m_ago)}% → ${fmt(hy.value)}%` : '', src: srcLine(hy, 'daily') },
+  ];
+  $('bond-grid').innerHTML = tiles.map(t => `
+    <div class="inset p-3.5 space-y-1">
+      <div class="text-[11px] text-gray-400">${t.label}</div>
+      <div class="text-lg font-extrabold mono ${t.cls || 'text-white'}">${t.val}</div>
+      <div class="text-[11px] text-gray-300 leading-relaxed">${t.note}</div>
+      <div>${t.src}</div>
+    </div>`).join('');
+}
 
 function renderLiquidity() {
   const m = D?.macro || {}, man = D?.manual || {};
@@ -1225,7 +1360,7 @@ $('btn-sim-copy').addEventListener('click', () => {
 // 8. 초기화
 // =====================================================================
 renderDataStatus();
-buildStageCards(); updateRadar(); renderLiquidity();
+buildStageCards(); updateRadar(); renderLiquidity(); renderBondRisk();
 updatePortfolio(); renderTeams();
 renderDcaPresets();
 const savedSym = store.get('cf_dca_sym', null);

@@ -111,6 +111,7 @@ ALT_SOURCES = {
     "RRPONTSYD": ("NY 연준 역레포 운영 결과 API", nyfed_rrp_rows),
     "NASDAQCOM": ("Yahoo ^IXIC", lambda: yahoo_rows("^IXIC")),
     "SP500": ("Yahoo ^GSPC", lambda: yahoo_rows("^GSPC")),
+    "SOFR": ("NY 연준 SOFR API", lambda: nyfed_sofr_rows()),
 }
 
 
@@ -245,6 +246,81 @@ def fx_snapshot(symbol):
         return None
 
 
+def pct_change(closes, n):
+    return round((closes[-1] / closes[-1 - n] - 1) * 100, 2) if len(closes) > n and closes[-1 - n] else None
+
+
+def nyfed_sofr_rows(days=400):
+    url = f"https://markets.newyorkfed.org/api/rates/secured/sofr/search.json?startDate={_start(days)}&endDate={date.today().isoformat()}"
+    rates = json.loads(http_get(url, UA_FRED))["refRates"]
+    return sorted((r["effectiveDate"], float(r["percentRate"])) for r in rates)
+
+
+def index_snapshot(symbol, label):
+    """MOVE·달러인덱스 같은 지수: 현재값, 5일/20일 변화율, 1년 범위. 일별 종가도 함께 반환."""
+    try:
+        pairs, meta = yahoo_closes(symbol, rng="5y")
+        off = meta.get("gmtoffset", 0)
+        closes = [c for _, c in pairs]
+        last252 = closes[-252:]
+        snap = {
+            "value": round(meta.get("regularMarketPrice") or closes[-1], 2),
+            "asOf": local_date(pairs[-1][0], off),
+            "chg_5d_pct": pct_change(closes, 5),
+            "chg_20d_pct": pct_change(closes, 20),
+            "high_1y": round(max(last252), 2),
+            "low_1y": round(min(last252), 2),
+            "source": f"Yahoo {symbol} ({label})",
+        }
+        series = [(local_date(t, off), c) for t, c in pairs]
+        return snap, series
+    except Exception as e:
+        errors.append(f"Yahoo {symbol}: {e}")
+        return None, []
+
+
+def dealer_burden(move_series):
+    """
+    VaR '추정' 지수 — 실제 금융기관 VaR가 아님.
+    프라이머리 딜러 국채 순보유액(NY 연준 주간) × 같은 날짜의 MOVE 지수로 '보유 재고 × 금리 변동성'을 만들고,
+    최근 3년 평균을 100으로 놓은 상대값. 재고가 쌓인 상태에서 변동성이 오르면 VaR 한도에 가까워진다는 연구 결과를 근사.
+    """
+    try:
+        ts = json.loads(http_get("https://markets.newyorkfed.org/api/pd/get/PDPOSGST-TOT.json", UA_FRED))["pd"]["timeseries"]
+        pos = [(t["asofdate"], float(t["value"])) for t in ts if t.get("value") not in (None, "", "*")]
+        mv = dict(move_series)
+        mdates = sorted(mv)
+        def move_on(d):  # 해당일 또는 직전 거래일 MOVE
+            lo, hi = 0, len(mdates) - 1
+            if not mdates or d < mdates[0]:
+                return None
+            while lo < hi:
+                mid = (lo + hi + 1) // 2
+                if mdates[mid] <= d: lo = mid
+                else: hi = mid - 1
+            return mv[mdates[lo]]
+        prod = [(d, p * m) for d, p in pos if (m := move_on(d))]
+        window = prod[-156:]  # 약 3년(주간)
+        if len(window) < 20:
+            raise ValueError("겹치는 기간 부족")
+        avg = sum(v for _, v in window) / len(window)
+        idx = [(d, v / avg * 100) for d, v in window]
+        last_d, last_i = idx[-1]
+        rank = sum(1 for _, v in idx if v <= last_i) / len(idx) * 100
+        return {
+            "value": round(last_i, 1),
+            "asOf": last_d,
+            "prev_4w": round(idx[-5][1], 1) if len(idx) > 5 else None,
+            "percentile_3y": round(rank),
+            "dealer_position_billion": round(pos[-1][1] / 1000, 1),
+            "dealer_position_asOf": pos[-1][0],
+            "source": "NY 연준 프라이머리 딜러 국채 보유(주간) × MOVE — 추정치",
+        }
+    except Exception as e:
+        errors.append(f"딜러 VaR 추정: {e}")
+        return None
+
+
 def vix_snapshot():
     try:
         pairs, meta = yahoo_closes("^VIX", rng="1y")
@@ -259,6 +335,8 @@ def vix_snapshot():
             "peak_60d_close": round(peak, 2),
             "peak_60d_date": utc_date(pairs[peak_idx][0]),
             "high52w_intraday": meta.get("fiftyTwoWeekHigh"),
+            "chg_5d_pct": pct_change(closes, 5),
+            "chg_20d_pct": pct_change(closes, 20),
             "source": "Yahoo ^VIX (종가 기준)",
         }
     except Exception as e:
@@ -287,6 +365,10 @@ def main():
         "m2_billion": ("M2SL", 1.0, 1),
         "nasdaq": ("NASDAQCOM", 1.0, 2),
         "sp500": ("SP500", 1.0, 2),
+        "sofr": ("SOFR", 1.0, 2),
+        "iorb": ("IORB", 1.0, 2),
+        "swap_lines_million": ("SWPT", 1.0, 0),      # 연준 해외 중앙은행 통화스와프 잔액(백만달러, 주간)
+        "jp10y": ("IRLTLT01JPM156N", 1.0, 3),       # 일본 10년물(월간)
     }
     rot = manual["rotation_pair"]
     kr = manual.get("watchlist_kr", {})          # {"005930.KS": "삼성전자", ...}
@@ -297,10 +379,16 @@ def main():
         vix_f = pool.submit(vix_snapshot)
         stock_f = {s: pool.submit(stock_snapshot, s, kr.get(s)) for s in yahoo_syms}
         fx_f = pool.submit(fx_snapshot, fx_sym)
+        move_f = pool.submit(index_snapshot, "^MOVE", "ICE BofA MOVE")
+        dxy_f = pool.submit(index_snapshot, "DX-Y.NYB", "달러인덱스")
         macro = {k: f.result() for k, f in fred_f.items()}
         snaps = {s: f.result() for s, f in stock_f.items()}
         vix_now = vix_f.result()
         macro["usdkrw"] = fx_f.result()
+        move_snap, move_series = move_f.result()
+        macro["move"] = move_snap
+        macro["dxy"] = dxy_f.result()[0]
+    macro["dealer_var_proxy"] = dealer_burden(move_series) if move_series else None
     # 실패한 항목은 이전 실행 값으로 대체하고 표시
     for k, v in macro.items():
         if v is None and prev.get("macro", {}).get(k):
